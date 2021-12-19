@@ -33,7 +33,7 @@ library
   build-depends:
       base >=4.7 && <5
     , constraints >=0.13.2
-    , inflist >=0.0.1
+    , inflist
   default-language: Haskell2010
 
 test-suite padic-test
@@ -47,6 +47,6 @@ test-suite padic-test
   build-depends:
       base >=4.7 && <5
     , constraints >=0.13.2
-    , inflist >=0.0.1
+    , inflist
     , padic
   default-language: Haskell2010
