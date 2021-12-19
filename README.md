@@ -1,2 +1,2 @@
 # padic
-Haskell modulle for p-adic numbers
+Haskell module for p-adic numbers
