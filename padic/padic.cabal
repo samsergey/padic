@@ -25,25 +25,15 @@ source-repository head
 
 library
   exposed-modules:
-      Lib
+      Padic
   other-modules:
       Paths_padic
   hs-source-dirs:
       src
   build-depends:
       base >=4.7 && <5
-  default-language: Haskell2010
-
-executable padic-exe
-  main-is: Main.hs
-  other-modules:
-      Paths_padic
-  hs-source-dirs:
-      app
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N
-  build-depends:
-      base >=4.7 && <5
-    , padic
+    , constraints >=0.13.2
+    , inflist >=0.0.1
   default-language: Haskell2010
 
 test-suite padic-test
@@ -56,5 +46,7 @@ test-suite padic-test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , constraints >=0.13.2
+    , inflist >=0.0.1
     , padic
   default-language: Haskell2010

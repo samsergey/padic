@@ -20,21 +20,15 @@ extra-source-files:
 description:         Please see the README on GitHub at <https://github.com/githubuser/padic#readme>
 
 dependencies:
-- base >= 4.7 && < 5
+ - base >= 4.7 && < 5
+ - constraints >= 0.13.2
+ - inflist >= 0.0.1
 
 library:
   source-dirs: src
 
-executables:
-  padic-exe:
-    main:                Main.hs
-    source-dirs:         app
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    dependencies:
-    - padic
+extra-deps:
+ - inflist-0.0.1@sha256:f78bb0b472e43dc475c1d9345dde5bafd554a0b780e7638235e6f25f71f3083d,1089
 
 tests:
   padic-test:
