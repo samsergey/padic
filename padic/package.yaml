@@ -24,6 +24,8 @@ dependencies:
  - constraints >= 0.13.2
  - inflist
  - mod >= 0.1.2.2
+ - hspec
+ - QuickCheck
 
 library:
   source-dirs: src
@@ -37,4 +39,9 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
+    - base
+    - hspec
     - padic
+    - QuickCheck
+    other-modules:
+      - ZSpec
