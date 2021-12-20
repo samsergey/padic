@@ -3,8 +3,8 @@
 {-# LANGUAGE KindSignatures #-}
 import GHC.TypeLits hiding (Mod)
 import GHC.Natural
-import InfList (InfList(..), (+++))
-import qualified InfList as I
+import Data.InfList (InfList(..), (+++))
+import qualified Data.InfList as I
 import Data.List
 import Data.Mod
 
@@ -69,7 +69,7 @@ instance KnownNat m => Show (Base m) where
     where
       process lst = case dropWhile (== 0) lst of
         [] -> "0"
-        l -> foldMap showDigit l
+        l -> unwords $ show <$> l
 
 showDigit n = pure $ (['0'..'9']++['a'..'z']) !! fromIntegral n
 

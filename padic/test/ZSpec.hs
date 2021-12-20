@@ -15,7 +15,7 @@ intHomo t a = let [x,_] = [fromInteger a,t]
 addHomo :: (Eq a, Num a) => a -> Integer -> Integer -> Bool
 addHomo t a b = let [x,y,_] = [fromInteger a, fromInteger b, t]
                 in x + y == fromInteger (a + b)
-
+                   
 mulHomo :: (Eq a, Num a) => a -> Integer -> Integer -> Bool
 mulHomo t a b = let [x,y,_] = [fromInteger a, fromInteger b, t]
                 in x * y == fromInteger (a * b)
@@ -54,6 +54,12 @@ mulSign :: (Eq a, Num a) => a -> a -> Bool
 mulSign a b = and [ a * (-b) == - (a * b)
                   , (- a) * (-b) == a * b ]
 
+divTest :: Base m => Z m -> Z m -> Z m -> Bool
+divTest t a b =
+  case a `divMaybe` b of
+    Nothing -> True
+    Just r -> b * r == a
+
             
 instance Base m => Arbitrary (Z m) where
   arbitrary = fromInteger <$> arbitrary
@@ -74,6 +80,7 @@ spec = do
     it "mulAssoc"  $ property $ mulAssoc  @(Z 2)
     it "mulDistr"  $ property $ mulDistr  @(Z 2)
     it "mulSign"   $ property $ mulSign   @(Z 2)
+    it "divTest"   $ property $ divTest   (0 :: Z 2)
   describe "base 10" $ do
     it "addHomo"   $ property $ addHomo  (0 :: Z 10)
     it "mulHomo"   $ property $ mulHomo  (0 :: Z 10)
