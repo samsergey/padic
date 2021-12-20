@@ -1,19 +1,16 @@
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE UndecidableSuperClasses #-}
-{-# LANGUAGE FlexibleContexts #-}
--- {-# LANGUAGE TypeOperators #-}
--- {-# LANGUAGE NoStarIsType #-}
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE GADTs #-}
 
 module Padic where
 
-import Data.Type.Bool
 import GHC.TypeLits
 import Data.Constraint
 import Data.InfList (InfList(..), (+++))
@@ -28,24 +25,22 @@ type family NonZeroNat (m :: Nat) :: Constraint where
   NonZeroNat 0 = TypeError ('Text "Zero base!")
   NonZeroNat m = ()
 
-type family ValidBase (m :: Nat) :: Constraint where
-  ValidBase m = (NonZeroNat m, KnownNat m)
+type family Base (m :: Nat) :: Constraint where
+  Base m = (NonZeroNat m, KnownNat m)
+
+type family Lg p n where
+  Lg p 0 = 0
+  Lg p n = Lg p (Div n p) + 1
+
+type family ZBase m :: Constraint where
+  ZBase m = (Base m, Base (MaxBase m))
 
 ------------------------------------------------------------
   
-class ValidBase p => Digital f p where
-  base       :: Integral i => f p -> i
-  digits'    :: f p -> InfList (Digit p)
-  fromDigits':: InfList (Digit p) -> f p
+class Digital n where
+  digits :: (Base p, n ~ f p) => n -> InfList (Digit p)
+  base :: Integral i => n -> i
 
-  digits :: Integral d => f p -> InfList d
-  digits n = fromIntegral <$> digits' n
-
-  fromDigits :: Integral d => InfList d -> f p
-  fromDigits ds = fromDigits $ fromIntegral <$> ds
-
-  firstDigit :: Integral a => f p -> a
-  firstDigit = Inf.head . digits
 
 class Fixed n where
   precision :: Integral i => n -> i
@@ -56,34 +51,32 @@ class Padic n where
   
 ------------------------------------------------------------
 
-type N = Word32
+type N = Word64
+type MaxN  = 2^64 :: Nat
+
+type family MaxBase p where
+  MaxBase p = p ^ (Lg p MaxN - 1)
 
 newtype Digit (m :: Nat) = Digit N
   deriving (Show, Num, Bounded, Eq, Real, Enum, Ord, Integral) via N
 
-instance ValidBase p => Digital Digit p where
+instance Base p => Digital (Digit p) where
+  digits = undefined
   base = fromIntegral . natVal
 
-data Z (p :: Nat) where
-   Z :: InfList (Digit p) -> Z p
-
-interior (Z ds) = ds
+data Z p where
+  Z :: ZBase p => InfList (Digit (MaxBase p)) -> Z p
 
 maxBase :: Integral i => i -> i
-maxBase p = p ^ (ilog p (maxBound :: N))
+maxBase p = p ^ ilog p (maxBound :: N)
 
 ilog b x = floor (logBase (fromIntegral b) (fromIntegral x))
 
-demolish :: (ValidBase p) => Digit p -> [Digit p]
-demolish n = res
+
+toDigits :: Base p => Integral i => i -> [Digit p] 
+toDigits n = res
   where
-    b = base n
-    res
-      | n == 0 = replicate (ilog b (maxBase b)) 0
-      | otherwise = unfoldr go n
-    go 0 = Nothing
-    go n = let (q, r) = quotRem n b
-           in Just (fromIntegral r, q)
+    res = toBase (base (head res)) n 
 
 toBase :: (Integral i, Integral d) => i -> i -> [d]
 toBase b 0 = [0]
@@ -94,29 +87,28 @@ toBase b n = res
     go n = let (q, r) = quotRem n b
            in Just (fromIntegral r, q)
 
-
 -- превращает целое число в p-адическое
-toZ :: (ValidBase p, Integral i) => i -> Z p
+toZ :: (ZBase p, Integral i) => i -> Z p
 toZ n | n < 0 = - toZ (- n)
       | otherwise = res 
   where
-    res = Z $ toBase (maxBase (base res)) (fromIntegral n) +++ Inf.repeat 0
+    res = Z $ toDigits (fromIntegral n) +++ Inf.repeat 0
 
 -- смена знака на противоположный
-negZ :: (ValidBase p) => Z p -> Z p
-negZ (Z ds) = fromDigits $ go ds
+negZ :: ZBase p => Z p -> Z p
+negZ (Z ds) = Z $ go ds
   where go (0 ::: t) = 0 ::: go t
         go (h ::: t) = p - h ::: Inf.map (\x -> p - x - 1) t
         p = base (Inf.head ds)
 
 -- выделяет из натурального числа перенос на следующий разряд
+carry :: (Base p, Integral n) => n -> (n, Digit p)
 carry n =
-  let d = fromIntegral (n `mod` b)
-      b = maxBase (base d)
-  in (n `div` b, d)
+  let d = fromIntegral (n `mod` base d)
+  in (n `div` base d, d)
 
 -- поразрядное сложение с переносом
---addZ :: (ValidBase p) => Z p -> Z p -> Z p
+--addZ :: (Base p) => Z p -> Z p -> Z p
 addZ a b = Inf.mapAccumL step 0 $ Inf.zip a b
   where
     step r (x, y) = carry (fromIntegral x + fromIntegral y + r)
@@ -126,21 +118,37 @@ mulZ a b = go b
     go (b ::: bs) = addZ (go bs) `apTail` scaleZ b a
     apTail f (h ::: t) = h ::: f t
 
---scaleZ :: Base p => Mod p -> InfList (Mod p) -> InfList (Mod p)
+--scaleZ :: ZBase p => Mod p -> InfList (Mod p) -> InfList (Mod p)
 scaleZ s a =
   Inf.mapAccumL (\r x -> carry (fromIntegral s * fromIntegral x + r)) 0 a
 
-
-instance ValidBase p => Digital Z p where
-  digits' (Z ds) = Inf.concatMap demolish ds
-  fromDigits' = Z
+instance ZBase p => Digital (Z p) where
   base = fromIntegral . natVal
+  digits (Z ds) = Inf.concatMap expand ds
 
-instance ValidBase p => Num (Z p) where
+expand :: ZBase p => Digit (MaxBase p) -> [Digit p]
+expand n = res
+  where
+    b1 = base n
+    b2 = base (head res)
+    res
+     | n == 0 = replicate (ilog b2 b1) 0
+     | otherwise = toBase b2  n
+
+instance ZBase p => Num (Z p) where
   fromInteger = toZ
   Z a + Z b = Z $ addZ a b
   Z a * Z b = Z $ mulZ a b
   negate = negZ
 
 newtype Z' (p :: Nat) (prec :: Nat) = Z' (Z p)
---  deriving (Digital) via (Z p)
+
+instance ZBase p => Num (Z' p prec) where
+  fromInteger = Z' . fromInteger
+
+instance ZBase p => Digital (Z' p prec) where
+  digits (Z' n) = digits n
+  base (Z' n) = base n
+
+instance KnownNat prec => Fixed (Z' p prec) where
+  precision = fromIntegral . natVal

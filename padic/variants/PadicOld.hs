@@ -9,8 +9,8 @@ module Padic where
 import GHC.TypeLits hiding (Mod)
 import Data.Mod
 import Data.Constraint
-import InfList (InfList(..), (+++))
-import qualified InfList as Inf
+import Data.InfList (InfList(..), (+++))
+import qualified Data.InfList as Inf
 import Data.List
 import Data.Ratio
 
