@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -14,6 +13,7 @@
 module Padic where
 
 import           GHC.TypeLits
+import GHC.Integer.GMP.Internals
 import           Data.Constraint
 import           Data.InfList (InfList(..), (+++))
 import qualified Data.InfList as Inf
@@ -40,7 +40,7 @@ type Base m = (ValidBase (MaxBase m), ValidBase m)
 type Digits p = InfList (Digit p)
   
 class Digital n where
-  digits :: n -> InfList (Digit p)
+  digits :: n -> Digits p
   base   :: Integral i => n -> i
 
 class Fixed n where
@@ -97,7 +97,7 @@ instance Base p => Num (Z p) where
   signum _ = 1
   Z a + Z b = Z $ addZ a b
   Z a * Z b = Z $ mulZ a b
-  negate = negZ
+  negate (Z a) = Z (negZ a)
 
 -- превращает целое число в p-адическое
 toZ :: Base p => Integer -> Z p
@@ -121,8 +121,8 @@ toBase b n = unfoldr go n
            in Just (fromIntegral r, q)
 
 -- смена знака на противоположный
-negZ :: Base p => Z p -> Z p
-negZ (Z ds) = Z $ go ds
+negZ :: ValidBase p => Digits p -> Digits p
+negZ ds = go ds
   where go (0 ::: t) = 0 ::: go t
         go (h ::: t) = p - h ::: Inf.map (\x -> p - x - 1) t
         p = base (Inf.head ds)
@@ -152,12 +152,36 @@ scaleZ :: ValidBase p => Digit p -> Digits p -> Digits p
 scaleZ s =
   Inf.mapAccumL (\r x -> carry (fromIntegral s * fromIntegral x + r)) 0
 
+instance Base p => Fractional (Z p) where
+  Z a / Z b = case divZ a b of
+                Just r -> Z r
+                Nothing -> error "undivisible number!"
+  fromRational = undefined
+
+-- поразрядное деление двух чисел "уголком"
+divZ :: ValidBase p => Digits p -> Digits p -> Maybe (Digits p)
+divZ a b = go a <$ invertMod (Inf.head b)
+  where
+    Just r = invertMod (Inf.head b)
+    go (0 ::: xs) = 0 ::: go xs
+    go xs =
+      let m = Inf.head xs * r
+          mulAndSub = addZ xs . negZ . scaleZ m 
+      in m ::: go (Inf.tail $ mulAndSub b)
+
+invertMod :: ValidBase p => Digit p -> Maybe (Digit p)
+invertMod x@(Digit d)
+  | gcd d (base x) == 1 =
+      Just (Digit $ fromInteger $ recipModInteger (fromIntegral d) (base x))
+  | otherwise = Nothing
+
 ------------------------------------------------------------
 
 newtype Z' (p :: Nat) (prec :: Nat) = Z' (Z p)
 
-deriving via Z p instance Base p => Num (Z' p prec)
 deriving via Z p instance Base p => Digital (Z' p prec)
+deriving via Z p instance Base p => Num (Z' p prec)
+deriving via Z p instance Base p => Fractional (Z' p prec)
   
 instance KnownNat prec => Fixed (Z' p prec) where
   precision = fromIntegral . natVal
@@ -177,3 +201,5 @@ instance (KnownNat prec, Base p) => Show (Z' p prec) where
       ell l = if length l < pr then "" else "…"
       sep = if base n < 11 then "" else " "
 
+instance (KnownNat prec, Base p) => Ord (Z' p prec) where
+  compare = error "ordering is not defined for Z"

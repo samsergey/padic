@@ -21,6 +21,7 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
  - base >= 4.7 && < 5
+ - integer-gmp
  - constraints >= 0.13.2
  - inflist
  - mod >= 0.1.2.2
@@ -45,3 +46,16 @@ tests:
     - QuickCheck
     other-modules:
       - ZSpec
+
+benchmarks:
+  criterion-benchmarks:
+    dependencies:
+      - criterion
+      - padic
+    ghc-options:
+      - -O2
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    main: BenchT.hs
+    source-dirs: bench
