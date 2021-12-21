@@ -24,8 +24,10 @@ source-repository head
   location: https://github.com/githubuser/padic
 
 library
-  exposed-modules:
-      Padic
+  exposed-modules: PadicD
+                 , PadicM
+                 , Padic
+      
   other-modules:
       Paths_padic
   hs-source-dirs:

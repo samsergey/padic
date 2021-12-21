@@ -11,13 +11,6 @@ packages:
       sha256: 999f1189f7e52e17b765063373fd3d936f9648f675dfd63ce3a34ba70195a36b
   original:
     hackage: inflist-0.0.1@sha256:f78bb0b472e43dc475c1d9345dde5bafd554a0b780e7638235e6f25f71f3083d,1089
-- completed:
-    hackage: mod-0.1.2.2@sha256:58bc3a1471bbbc55569bf61fd49b537c3e64b0a86dd79522ca1d7805400523ce,2248
-    pantry-tree:
-      size: 467
-      sha256: 8ecb31ca19a860d23ba3f98534eeeab15fcd2f105f82917aaf0ad7b8c8a664ed
-  original:
-    hackage: mod-0.1.2.2
 snapshots:
 - completed:
     size: 586103

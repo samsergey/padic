@@ -24,7 +24,7 @@ dependencies:
  - integer-gmp
  - constraints >= 0.13.2
  - inflist
- - mod >= 0.1.2.2
+ - mod
  - hspec
  - QuickCheck
 

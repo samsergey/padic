@@ -80,7 +80,6 @@ spec = do
     it "mulAssoc"  $ property $ mulAssoc  @(Z 2)
     it "mulDistr"  $ property $ mulDistr  @(Z 2)
     it "mulSign"   $ property $ mulSign   @(Z 2)
-    it "divTest"   $ property $ divTest   (0 :: Z 2)
   describe "base 10" $ do
     it "addHomo"   $ property $ addHomo  (0 :: Z 10)
     it "mulHomo"   $ property $ mulHomo  (0 :: Z 10)
