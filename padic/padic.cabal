@@ -24,21 +24,20 @@ source-repository head
   location: https://github.com/githubuser/padic
 
 library
-  exposed-modules: Padic
-      
+  exposed-modules:
+      Padic
   other-modules:
       Paths_padic
   hs-source-dirs:
       src
   build-depends:
-                    QuickCheck
-                , base >=4.7 && <5
-                , constraints >=0.13.2
-                , hspec
-                , inflist
-                , integer-gmp
-                , mod >=0.1.2.2
-                , primes >= 0.2.1.0
+      QuickCheck
+    , base >=4.7 && <5
+    , constraints >=0.13.2
+    , hspec
+    , inflist
+    , integer-gmp
+    , mod
   default-language: Haskell2010
 
 test-suite padic-test
@@ -50,16 +49,15 @@ test-suite padic-test
       test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-                    QuickCheck
-                , base
-                , constraints >=0.13.2
-                , hspec
-                , inflist
-                , integer-gmp
-                , mod >=0.1.2.2
-                , padic
-                , primes
-                , primes >= 0.2.1.0
+      QuickCheck
+    , base
+    , constraints >=0.13.2
+    , hspec
+    , inflist
+    , integer-gmp
+    , mod
+    , padic
+    , primes
   default-language: Haskell2010
 
 benchmark criterion-benchmarks
@@ -71,14 +69,13 @@ benchmark criterion-benchmarks
       bench
   ghc-options: -O2 -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-                    QuickCheck
-                , base >=4.7 && <5
-                , constraints >=0.13.2
-                , criterion
-                , hspec
-                , inflist
-                , integer-gmp
-                , mod >=0.1.2.2
-                , padic
-                , primes >= 0.2.1.0
+      QuickCheck
+    , base >=4.7 && <5
+    , constraints >=0.13.2
+    , criterion
+    , hspec
+    , inflist
+    , integer-gmp
+    , mod
+    , padic
   default-language: Haskell2010

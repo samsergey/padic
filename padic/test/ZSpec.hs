@@ -8,7 +8,6 @@ module ZSpec where
 import Test.Hspec
 import Test.QuickCheck
 import Padic
-import Data.Numbers.Primes (primeFactors)
 import Data.List
 import qualified Data.InfList as Inf
 import Data.Mod
@@ -90,19 +89,11 @@ arbitraryZ = fromDigits . Inf.fromList <$> infiniteList
 rationalZ :: Radix p => Gen (Z p)
 rationalZ = do
   a <- integerZ
-  bs <- infiniteListOf integerZ
-  return $ head (mapMaybe (a `divMaybe`) bs)
+  b <- suchThat integerZ (isJust . divMaybe a)
+  return $ a `div` b
 
 instance Radix m => Arbitrary (Z m) where
-  arbitrary = oneof [i, z, r]
-    where
-      z = fromDigits . Inf.fromList <$> infiniteList
-      i = fromInteger <$> arbitrary
-      r = do a <- fromInteger <$> arbitrary
-             b <- fromInteger <$> arbitrary
-             case a `divMaybe` b of
-               Nothing -> return a
-               Just r -> return r
+  arbitrary = oneof [integerZ, rationalZ, arbitraryZ]
 
 spec :: Spec
 spec = do
