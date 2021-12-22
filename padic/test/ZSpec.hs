@@ -1,12 +1,18 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# language TypeApplications #-}
+{-# language GeneralizedNewtypeDeriving #-}
 
 module ZSpec where
 
 import Test.Hspec
 import Test.QuickCheck
 import Padic
+import Data.Numbers.Primes (primeFactors)
+import Data.List
+import qualified Data.InfList as Inf
+import Data.Mod
+import Data.Maybe
 
 intHomo :: Integral a => a -> Integer -> Bool
 intHomo t a = let [x,_] = [fromInteger a,t]
@@ -54,19 +60,54 @@ mulSign :: (Eq a, Num a) => a -> a -> Bool
 mulSign a b = and [ a * (-b) == - (a * b)
                   , (- a) * (-b) == a * b ]
 
-divTest :: Base m => Z m -> Z m -> Z m -> Bool
+divTest :: Radix m => Z m -> Z m -> Z m -> Bool
 divTest t a b =
   case a `divMaybe` b of
     Nothing -> True
     Just r -> b * r == a
 
-            
-instance Base m => Arbitrary (Z m) where
+splitUnitTest :: Radix p => Z p -> Integer -> Bool
+splitUnitTest t a =
+  let [_, x] = [t, fromInteger a]
+      b = base x
+      v' = plog b (abs a)
+      u' = abs a `div` (b^v')
+      (u, v) = splitUnit x
+  in if a == 0
+     then u == 0 && v == maxBound
+     else u == fromInteger (signum a * u') && v == v'
+
+
+instance Radix m => Arbitrary (Mod m) where
   arbitrary = fromInteger <$> arbitrary
+
+integerZ :: Radix p => Gen (Z p)
+integerZ = fromInteger <$> arbitrary
+
+arbitraryZ :: Radix p => Gen (Z p)
+arbitraryZ = fromDigits . Inf.fromList <$> infiniteList
+
+rationalZ :: Radix p => Gen (Z p)
+rationalZ = do
+  a <- integerZ
+  bs <- infiniteListOf integerZ
+  return $ head (mapMaybe (a `divMaybe`) bs)
+
+instance Radix m => Arbitrary (Z m) where
+  arbitrary = oneof [i, z, r]
+    where
+      z = fromDigits . Inf.fromList <$> infiniteList
+      i = fromInteger <$> arbitrary
+      r = do a <- fromInteger <$> arbitrary
+             b <- fromInteger <$> arbitrary
+             case a `divMaybe` b of
+               Nothing -> return a
+               Just r -> return r
 
 spec :: Spec
 spec = do
   describe "base 2" $ do
+    it "intHomo"   $ property $ intHomo  (0 :: Z 2)
     it "addHomo"   $ property $ addHomo  (0 :: Z 2)
     it "mulHomo"   $ property $ mulHomo  (0 :: Z 2)
     it "addComm"   $ property $ addComm   @(Z 2)
@@ -80,7 +121,10 @@ spec = do
     it "mulAssoc"  $ property $ mulAssoc  @(Z 2)
     it "mulDistr"  $ property $ mulDistr  @(Z 2)
     it "mulSign"   $ property $ mulSign   @(Z 2)
+    it "splitUnit" $ property $ splitUnitTest (0 :: Z 2)
+
   describe "base 10" $ do
+    it "intHomo"   $ property $ intHomo  (0 :: Z 10)
     it "addHomo"   $ property $ addHomo  (0 :: Z 10)
     it "mulHomo"   $ property $ mulHomo  (0 :: Z 10)
     it "addComm"   $ property $ addComm   @(Z 10)
@@ -94,7 +138,10 @@ spec = do
     it "mulAssoc"  $ property $ mulAssoc  @(Z 10)
     it "mulDistr"  $ property $ mulDistr  @(Z 10)
     it "mulSign"   $ property $ mulSign   @(Z 10)
+    it "splitUnit" $ property $ splitUnitTest (0 :: Z 10)
+      
   describe "base 131" $ do
+    it "intHomo"   $ property $ intHomo  (0 :: Z 131)    
     it "addHomo"   $ property $ addHomo  (0 :: Z 131)
     it "mulHomo"   $ property $ mulHomo  (0 :: Z 131)
     it "addComm"   $ property $ addComm   @(Z 131)
@@ -108,4 +155,4 @@ spec = do
     it "mulAssoc"  $ property $ mulAssoc  @(Z 131)
     it "mulDistr"  $ property $ mulDistr  @(Z 131)
     it "mulSign"   $ property $ mulSign   @(Z 131)
-
+    it "splitUnit" $ property $ splitUnitTest (0 :: Z 131)

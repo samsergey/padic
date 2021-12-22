@@ -42,6 +42,7 @@ tests:
     dependencies:
     - base
     - hspec
+    - primes
     - padic
     - QuickCheck
     other-modules:
