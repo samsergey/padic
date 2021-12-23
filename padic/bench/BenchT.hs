@@ -1,10 +1,10 @@
 {-# language TypeApplications #-}
 {-# language DataKinds #-}
+{-# language FlexibleContexts #-}
+
 import Criterion.Main
-import Padic (Radix)
-import qualified Padic as M
-import qualified PadicD as D
-import qualified PadicN as N
+import Padic
+import qualified PadicL as L
 import Data.Maybe
 
 addBench :: (Num (f p), Radix p) => f p -> Int -> f p
@@ -13,37 +13,46 @@ addBench w n = w + sum (fromIntegral <$> [1..n])
 mulBench :: (Num (f p), Radix p) => f p -> Int -> f p
 mulBench w n = w + product (fromIntegral <$> [1..n])
 
-divBench :: (Num (f p), Radix p) => (f p -> f p -> Maybe (f p)) -> f p -> Int -> f p
+
+--divBench :: (Num (f p), Radix p) => (f p -> f p -> Maybe (f p)) -> f p -> Int -> f p
 divBench d w n = w + sum s
   where
     s = catMaybes [ d a b | a <- fromIntegral <$> [1..n]
                           , b <- fromIntegral <$> [1..n] ]
 
+
 suite :: [Benchmark]
 suite =
   [ bgroup
       "add"
-      [ bench "D 2" $ whnf (addBench (0 :: D.Z 2)) 4000
-      , bench "D 13" $ whnf (addBench (0 :: D.Z 13)) 4000
-      , bench "D 251" $ whnf (addBench (0 :: D.Z 251)) 4000
-      , bench "M 2" $ whnf (addBench (0 :: M.Z 2)) 4000
-      , bench "M 13" $ whnf (addBench (0 :: M.Z 13)) 4000
-      , bench "M 251" $ whnf (addBench (0 :: M.Z 251)) 4000
-      , bench "N 2" $ whnf (addBench (0 :: N.Z 2)) 4000
-      , bench "N 13" $ whnf (addBench (0 :: N.Z 13)) 4000
-      , bench "N 251" $ whnf (addBench (0 :: N.Z 251)) 4000]
+      [ bench "Z 2" $ whnf (addBench (0 :: Z 2)) 4000
+      , bench "Z 3" $ whnf (addBench (0 :: Z 3)) 4000 
+      , bench "Z 13" $ whnf (addBench (0 :: Z 13)) 4000
+      , bench "Z 251" $ whnf (addBench (0 :: Z 251)) 4000
+      , bench "L.Z 2" $ whnf (addBench (0 :: L.Z 2)) 4000
+      , bench "L.Z 3" $ whnf (addBench (0 :: L.Z 3)) 4000
+      , bench "L.Z 13" $ whnf (addBench (0 :: L.Z 13)) 4000
+      , bench "L.Z 251" $ whnf (addBench (0 :: L.Z 251)) 4000]
   , bgroup
       "mul"
-      [ bench "D 2" $ whnf (mulBench (0 :: D.Z 2)) 4000
-      , bench "D 13" $ whnf (mulBench (0 :: D.Z 13)) 4000
-      , bench "D 251" $ whnf (mulBench (0 :: D.Z 251)) 4000
-      , bench "M 2" $ whnf (mulBench (0 :: M.Z 2)) 4000
-      , bench "M 13" $ whnf (mulBench (0 :: M.Z 13)) 4000
-      , bench "M 251" $ whnf (mulBench (0 :: M.Z 251)) 4000
-      , bench "N 2" $ whnf (mulBench (0 :: N.Z 2)) 4000
-      , bench "N 13" $ whnf (mulBench (0 :: N.Z 13)) 4000
-      , bench "N 251" $ whnf (mulBench (0 :: N.Z 251)) 4000]
-  ]
+      [ bench "Z 2" $ whnf (mulBench (0 :: Z 2)) 4000
+      , bench "Z 3" $ whnf (mulBench (0 :: Z 3)) 4000 
+      , bench "Z 13" $ whnf (mulBench (0 :: Z 13)) 4000
+      , bench "Z 251" $ whnf (mulBench (0 :: Z 251)) 4000
+      , bench "L.Z 2" $ whnf (mulBench (0 :: L.Z 2)) 4000
+      , bench "L.Z 3" $ whnf (mulBench (0 :: L.Z 3)) 4000
+      , bench "L.Z 13" $ whnf (mulBench (0 :: L.Z 13)) 4000
+      , bench "L.Z 251" $ whnf (mulBench (0 :: L.Z 251)) 4000]
+  , bgroup
+      "div"
+      [ bench "Z 2" $ whnf (divBench divMaybe (0 :: Z 2)) 60
+      , bench "Z 3" $ whnf (divBench divMaybe (0 :: Z 3)) 60 
+      , bench "Z 13" $ whnf (divBench divMaybe (0 :: Z 13)) 60
+      , bench "Z 251" $ whnf (divBench divMaybe (0 :: Z 251)) 60
+      , bench "L.Z 2" $ whnf (divBench L.divMaybe (0 :: L.Z 2)) 60
+      , bench "L.Z 3" $ whnf (divBench L.divMaybe (0 :: L.Z 3)) 60
+      , bench "L.Z 13" $ whnf (divBench L.divMaybe (0 :: L.Z 13)) 60
+      , bench "L.Z 251" $ whnf (divBench L.divMaybe (0 :: L.Z 251)) 60]  ]
 
 main :: IO ()
 main = defaultMain suite

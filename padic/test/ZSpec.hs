@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# language TypeApplications #-}
@@ -7,7 +8,7 @@ module ZSpec where
 
 import Test.Hspec
 import Test.QuickCheck
-import Padic
+import PadicL
 import Data.List
 import qualified Data.InfList as Inf
 import Data.Mod
@@ -75,6 +76,8 @@ splitUnitTest t a =
   in if a == 0
      then u == 0 && v == maxBound
      else u == fromInteger (signum a * u') && v == v'
+
+plog a b = floor (logBase (fromIntegral a) (fromIntegral b))
 
 
 instance Radix m => Arbitrary (Mod m) where

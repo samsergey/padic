@@ -21,7 +21,6 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
  - base >= 4.7 && < 5
- - integer-gmp
  - constraints >= 0.13.2
  - inflist
  - mod
@@ -41,9 +40,8 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - base
-    - hspec
-    - primes
     - padic
+    - hspec
     - QuickCheck
     other-modules:
       - ZSpec

@@ -21,8 +21,8 @@ Portability : POSIX
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DataKinds #-}
 
-module Padic
-  ( Radix
+module PadicL
+{-  ( Radix
   , Digital
   , Fixed
   , Padic
@@ -32,7 +32,7 @@ module Padic
   , LiftedDigits
   , Z
   , Z'
-  , divMaybe ) where
+  , divMaybe ) -} where
 
 import           GHC.TypeLits hiding (Mod)
 import           Data.Constraint (Constraint)
@@ -40,6 +40,7 @@ import           Data.InfList (InfList(..), (+++))
 import qualified Data.InfList as Inf
 import           Data.List
 import           Data.Mod
+import           Data.Word
 
 ------------------------------------------------------------
 
@@ -111,13 +112,9 @@ instance (KnownNat p, ValidRadix p) => Digital (Mod p) where
   fromDigits = id
   radix = fromIntegral . natVal
   
-type LiftedRadix' p = p ^ (Lg p (2^64) - 1)
+type LiftedRadix p = p ^ (Lg p (2^64) - 1)
 
-type family LiftedRadix p :: Nat where
-  LiftedRadix 2 = 2^64
-  LiftedRadix 3 = 3^40
-  LiftedRadix p = p ^ Div 434 (Log2 (p^7))
-
+type N = Word64
 
 -- | Type for a radix p lifted to power k so that p^k fits to 'Word32'
 newtype Lifted p = Lifted { unlift :: Mod (LiftedRadix p) }
@@ -216,7 +213,7 @@ negZ = go
         go (h ::: t) = - h ::: Inf.map (\x -> - x - 1) t
 
 -- выделяет из натурального числа перенос на следующий разряд
---carry :: (ValidRadix p, Integral i) => i -> (i,  Mod p)
+carry :: (Digital b, Num b) => N -> (N, b)
 carry n = let d = fromIntegral n in (n `div` radix d, d)
     
 -- поразрядное сложение с переносом
