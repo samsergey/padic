@@ -1,19 +1,19 @@
 {-# language TypeApplications #-}
 {-# language DataKinds #-}
 import Criterion.Main
-import PadicD (Base)
+import Padic (Radix)
+import qualified Padic as M
 import qualified PadicD as D
-import qualified PadicM as M
-import qualified Padic as N
+import qualified PadicN as N
 import Data.Maybe
 
-addBench :: (Num (f p), Base p) => f p -> Int -> f p
+addBench :: (Num (f p), Radix p) => f p -> Int -> f p
 addBench w n = w + sum (fromIntegral <$> [1..n])
 
-mulBench :: (Num (f p), Base p) => f p -> Int -> f p
+mulBench :: (Num (f p), Radix p) => f p -> Int -> f p
 mulBench w n = w + product (fromIntegral <$> [1..n])
 
-divBench :: (Num (f p), Base p) => (f p -> f p -> Maybe (f p)) -> f p -> Int -> f p
+divBench :: (Num (f p), Radix p) => (f p -> f p -> Maybe (f p)) -> f p -> Int -> f p
 divBench d w n = w + sum s
   where
     s = catMaybes [ d a b | a <- fromIntegral <$> [1..n]
