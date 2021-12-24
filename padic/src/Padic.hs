@@ -1,12 +1,11 @@
 {-|
 Module      : Padic
-Description : Simple algebra for p-adic numbers.
-Copyright   : (c) Sergey samoylenko, 2021
+Description : Representation a nd simple algebra for p-adic numbers.
+Copyright   : (c) Sergey Samoylenko, 2021
 License     : GPL-3
 Maintainer  : samsergey@yandex.ru
 Stability   : experimental
 Portability : POSIX
-
 
 -}
 
@@ -35,6 +34,7 @@ module Padic
   , divMaybe ) where
 
 import           GHC.TypeLits hiding (Mod)
+import           GHC.Natural
 import           Data.Constraint (Constraint)
 import           Data.InfList (InfList(..), (+++))
 import qualified Data.InfList as Inf
@@ -68,7 +68,7 @@ class Digital n where
   -- | returns digits of a number
   digits :: n -> Digits n
 
-  -- | An associative operation.
+  -- | Returns the radix of a number
   --
   -- >>> radix (5 :: Z 13)
   -- 13
@@ -111,13 +111,7 @@ instance (KnownNat p, ValidRadix p) => Digital (Mod p) where
   fromDigits = id
   radix = fromIntegral . natVal
   
-type LiftedRadix' p = p ^ (Lg p (2^64) - 1)
-
-type family LiftedRadix p :: Nat where
-  LiftedRadix 2 = 2^64
-  LiftedRadix 3 = 3^40
-  LiftedRadix p = p ^ Div 434 (Log2 (p^7))
-
+type LiftedRadix p = p ^ (Lg p (2^64) - 1)
 
 -- | Type for a radix p lifted to power k so that p^k fits to 'Word32'
 newtype Lifted p = Lifted { unlift :: Mod (LiftedRadix p) }
@@ -126,8 +120,8 @@ deriving via Mod (LiftedRadix p) instance Radix p => Show (Lifted p)
 deriving via Mod (LiftedRadix p) instance Radix p => Eq (Lifted p)
 deriving via Mod (LiftedRadix p) instance Radix p => Ord (Lifted p)
 deriving via Mod (LiftedRadix p) instance Radix p => Num (Lifted p)
-deriving via Mod (LiftedRadix p) instance Radix p => Digital (Lifted p)
 deriving via Mod (LiftedRadix p) instance Radix p => Enum (Lifted p)
+deriving via Mod (LiftedRadix p) instance Radix p => Digital (Lifted p)
 
 instance Radix p => Real (Lifted p) where
   toRational = undefined
@@ -216,7 +210,7 @@ negZ = go
         go (h ::: t) = - h ::: Inf.map (\x -> - x - 1) t
 
 -- выделяет из натурального числа перенос на следующий разряд
---carry :: (ValidRadix p, Integral i) => i -> (i,  Mod p)
+carry :: (Integral a, Digital b, Num b) => a -> (a, b)
 carry n = let d = fromIntegral n in (n `div` radix d, d)
     
 -- поразрядное сложение с переносом
@@ -257,7 +251,7 @@ invert (Lifted m) = Lifted <$> invertMod m
 ------------------------------------------------------------
 
 -- |  Integer p-adic number with explicitly specified precision
-newtype Z' (p :: Nat) (prec :: Nat) = Z' {getZ :: Z p}
+newtype Z' (p :: Nat) (prec :: Nat) = Z' (Z p)
 
 deriving via Z p instance Radix p => Digital (Z' p prec)
 deriving via Z p instance Radix p => Num (Z' p prec)

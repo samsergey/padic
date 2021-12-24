@@ -26,7 +26,6 @@ source-repository head
 library
   exposed-modules:
       Padic
-      PadicL
   other-modules:
       Paths_padic
   hs-source-dirs:

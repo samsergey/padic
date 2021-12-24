@@ -8,7 +8,7 @@ module ZSpec where
 
 import Test.Hspec
 import Test.QuickCheck
-import PadicL
+import Padic
 import Data.List
 import qualified Data.InfList as Inf
 import Data.Mod
@@ -69,7 +69,7 @@ divTest t a b =
 splitUnitTest :: Radix p => Z p -> Integer -> Bool
 splitUnitTest t a =
   let [_, x] = [t, fromInteger a]
-      b = base x
+      b = radix x
       v' = plog b (abs a)
       u' = abs a `div` (b^v')
       (u, v) = splitUnit x
@@ -100,7 +100,7 @@ instance Radix m => Arbitrary (Z m) where
 
 spec :: Spec
 spec = do
-  describe "base 2" $ do
+  describe "radix 2" $ do
     it "intHomo"   $ property $ intHomo  (0 :: Z 2)
     it "addHomo"   $ property $ addHomo  (0 :: Z 2)
     it "mulHomo"   $ property $ mulHomo  (0 :: Z 2)
@@ -117,7 +117,7 @@ spec = do
     it "mulSign"   $ property $ mulSign   @(Z 2)
     it "splitUnit" $ property $ splitUnitTest (0 :: Z 2)
 
-  describe "base 10" $ do
+  describe "radix 10" $ do
     it "intHomo"   $ property $ intHomo  (0 :: Z 10)
     it "addHomo"   $ property $ addHomo  (0 :: Z 10)
     it "mulHomo"   $ property $ mulHomo  (0 :: Z 10)
@@ -134,7 +134,7 @@ spec = do
     it "mulSign"   $ property $ mulSign   @(Z 10)
     it "splitUnit" $ property $ splitUnitTest (0 :: Z 10)
       
-  describe "base 131" $ do
+  describe "radix 131" $ do
     it "intHomo"   $ property $ intHomo  (0 :: Z 131)    
     it "addHomo"   $ property $ addHomo  (0 :: Z 131)
     it "mulHomo"   $ property $ mulHomo  (0 :: Z 131)
