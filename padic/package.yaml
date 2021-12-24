@@ -46,15 +46,15 @@ tests:
     other-modules:
       - ZSpec
 
-benchmarks:
-  criterion-benchmarks:
-    dependencies:
-      - criterion
-      - padic
-    ghc-options:
-      - -O2
-      - -threaded
-      - -rtsopts
-      - -with-rtsopts=-N
-    main: BenchT.hs
-    source-dirs: bench
+# benchmarks:
+#   criterion-benchmarks:
+#     dependencies:
+#       - criterion
+#       - padic
+#     ghc-options:
+#       - -O2
+#       - -threaded
+#       - -rtsopts
+#       - -with-rtsopts=-N
+#     main: BenchT.hs
+#     source-dirs: bench

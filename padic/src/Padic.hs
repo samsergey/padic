@@ -18,12 +18,14 @@ Portability : POSIX
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Padic
   ( Radix
   , Digital
-  , Fixed
+  , radix, digits, fromDigits
   , Padic
+  , splitUnit
   , unit
   , valuation
   , Digits
@@ -38,6 +40,7 @@ import Data.InfList (InfList(..), (+++))
 import qualified Data.InfList as Inf
 import Data.List
 import Data.Mod
+import Data.Maybe
 import GHC.Natural
 import GHC.TypeLits hiding (Mod)
 
@@ -71,14 +74,11 @@ class Digital n where
   -- 13
   radix :: Integral i => n -> i
 
--- | Typeclass for numbers with fixed precision
-class Fixed n where
-  precision :: Integral i => n -> i -- ^ returns a precision as a number of digits
-
 -- | Typeclass for p-adic numbers
 class Digital n =>
       Padic n
   where
+  precision :: Integral i => n -> i -- ^ returns precision a number
   splitUnit :: n -> (n, Int) -- ^ returns valuation and unit of a number
 
 -- | returns the unit of a number
@@ -100,6 +100,12 @@ unit = fst . splitUnit
 -- 2
 valuation :: Padic n => n -> Int
 valuation = snd . splitUnit
+
+instance Digital p => Digital (InfList p) where
+  type Digits (InfList p) = InfList (Digits p)
+  radix (x ::: _) = radix x
+  digits = undefined
+  fromDigits = undefined
 
 ------------------------------------------------------------
 instance (KnownNat p, ValidRadix p) => Digital (Mod p) where
@@ -158,8 +164,6 @@ deriving via (Z' p 20) instance Radix p => Real (Z p)
 
 deriving via (Z' p 20) instance Radix p => Integral (Z p)
 
-deriving via (Z' p 20) instance Radix p => Fixed (Z p)
-
 deriving via (Z' p 20) instance Radix p => Padic (Z p)
 
 instance Radix p => Digital (Z p) where
@@ -175,8 +179,9 @@ liftDigits ds = res
     go xs =
       let (a, r) = Inf.splitAt k xs
        in (fromRadix b (unMod <$> a), r)
-    b = radix (Inf.head ds)
-    k = ilog b (radix (Inf.head res))
+    b = radix ds
+    k = ilog b (radix res)
+
 
 unliftDigits :: Radix p => LiftedDigits p -> Digits (Z p)
 unliftDigits ds = Inf.concatMap expand (unlift <$> ds)
@@ -273,18 +278,16 @@ deriving via Z p instance Radix p => Digital (Z' p prec)
 
 deriving via Z p instance Radix p => Num (Z' p prec)
 
-instance KnownNat prec => Fixed (Z' p prec) where
-  precision = fromIntegral . natVal
-
 instance (KnownNat prec, Radix p) => Padic (Z' p prec) where
-  splitUnit (Z' n) = go p (digits n)
+  precision = fromIntegral . natVal
+  splitUnit n = go prec (digits n)
     where
-      p = precision n
+      prec = precision n
       go 0 _ = (fromDigits $ Inf.repeat 0, maxBound)
-      go k x =
-        case x of
+      go k xs =
+        case xs of
           0 ::: ds -> go (k - 1) ds
-          _ -> (fromDigits x, p - k)
+          _ -> (fromDigits xs, prec - k)
 
 instance (KnownNat prec, Radix p) => Eq (Z' p prec) where
   x@(Z' a) == Z' b = Inf.take pr (digits a) == Inf.take pr (digits b)
@@ -297,17 +300,19 @@ instance (KnownNat prec, Radix p) => Ord (Z' p prec) where
 instance (KnownNat prec, Radix p) => Show (Z' p prec) where
   show 0 = "0"
   show n =
-    case findPeriod n of
-      Just (pref, [0]) -> intercalate sep (showD <$> pref)
-      Just (pref, cyc) ->
-        let sp = intercalate sep $ showD <$> reverse pref
-            sc = intercalate sep $ showD <$> reverse cyc
-         in "(" ++ sc ++ ")" ++ sp
-      Nothing -> process . reverse . Inf.take pr $ digits n
+    case findCycle pr (Inf.toList $ digits n) of
+      (pref, [])  -> "…" ++ toString pref
+      (pref, [0]) -> toString pref
+      (pref, cyc)
+        | length pref + length cyc <= pr ->
+          let sp = toString pref
+              sc = toString cyc
+           in "(" ++ sc ++ ")" ++ sep ++ sp
+        | otherwise -> "…" ++ toString (take pr $ pref ++ cyc)
     where
       pr = precision n
       showD = show . unMod
-      process lst = "…" ++ intercalate sep (showD <$> lst)
+      toString = intercalate sep . map showD . reverse
       sep
         | radix n < 11 = ""
         | otherwise = " "
@@ -321,10 +326,16 @@ instance (KnownNat prec, Radix p) => Real (Z' p prec) where
 
 instance (KnownNat prec, Radix p) => Integral (Z' p prec) where
   toInteger n =
-    case integerDigits n of
-      Right [] -> error "number doesn't seem to be integer."
-      Right xs -> foldl (\r x -> x + r * radix n) 0 xs
-      Left xs -> foldl (\r x -> x + 1 + (r - 1) * radix n) 0 xs - 1
+    case findCycle prec ds of
+      (xs, [t])
+        | t == 0 -> foldr (\x r -> x + r * p) 0 xs
+        | t == (p - 1) -> foldr (\x r -> x + 1 + (r - 1) * p) 0 xs - 1
+      _ -> foldr (\x r -> x + r * p) 0 (take prec ds)
+    where
+      prec = precision n
+      p = radix n
+      ds = map (fromIntegral . unMod) . Inf.toList $ digits n
+      
   div (Z' a) d@(Z' b) =
     case divMaybe a b of
       Just r -> Z' r
@@ -332,49 +343,30 @@ instance (KnownNat prec, Radix p) => Integral (Z' p prec) where
         error $ show d ++ " is indivisible in " ++ show (radix d) ++ "-adics!"
   quotRem = error "quotRem is not defined for p-adics!"
 
-integerDigits ::
-     (KnownNat prec, Radix p, Integral a) => Z' p prec -> Either [a] [a]
-integerDigits n = go [] windows
-  where
-    b = radix n
-    chop = precision n
-    windows =
-      take (fromIntegral chop) $
-      map (take (1 + fromIntegral chop)) $
-      tails $ map unMod $ Inf.toList (digits n)
-    go _ [] = Right []
-    go r ((x:xs):ws) =
-      case sum xs of
-        s
-          | s == 0 -> Right (fromIntegral x : r)
-          | s == (b - 1) * chop -> Left (fromIntegral x : r)
-          | otherwise -> go (fromIntegral x : r) ws
 
-findPeriod ::
-     (KnownNat n, Eq a, Fixed (f n), Digital (f n), Digits (f n) ~ InfList a)
-  => f n
-  -> Maybe ([a], [a])
-findPeriod n = findCycle (precision n) $ Inf.toList $ digits n
-
-findCycle :: Eq a => Int -> [a] -> Maybe ([a], [a])
+findCycle :: Eq a => Int -> [a] -> ([a], [a])
 findCycle len lst =
   case turlteHare rest of
-    [(a, c)] -> Just $ clean $ rollback (pref ++ a, c)
-    [] -> Nothing
+    Just (a, c) -> clean $ rollback (pref ++ a, c)
+    Nothing -> (pref, [])
   where
     (pref, rest) = splitAt len lst
     turlteHare x =
-      map (fmap fst) . take 1 $
-      dropWhile (\(p, (a, b)) -> isCycle a b) $
+      fmap (fmap fst) . listToMaybe $
+      dropWhile (\(_, (a, b)) -> isCycle a b) $
       zip (inits x) $
-      zipWith splitAt [1 .. len] $ zipWith take [4,8 ..] $ tails x
+      zipWith splitAt [2 .. len] $ zipWith take [8 ..] $ tails x
     isCycle a b = concat (replicate 3 a) /= b
-    rollback (as, bs) = go (reverse as) (reverse bs)
+    rollback (as, bs) = go (reverse as, reverse bs)
       where
-        go [] bs = ([], reverse bs)
-        go (a:as) (b:bs)
-          | a == b = go as (bs ++ [a])
-          | otherwise = (reverse (a : as), reverse (b : bs))
-    clean (x, c:cs)
-      | all (c ==) cs = (x, [c])
-      | otherwise = (x, c : cs)
+        go =
+          \case
+            ([], ys) -> ([], reverse ys)
+            (x:xs, y:ys)
+              | x == y -> go (xs, ys ++ [x])
+            (xs, ys) -> (reverse xs, reverse ys)
+    clean =
+      \case
+        (x, c:cs)
+          | all (c ==) cs -> (x, [c])
+        other -> other
