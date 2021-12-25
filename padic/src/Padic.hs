@@ -11,8 +11,6 @@ Portability : POSIX
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ConstraintKinds #-}
@@ -100,6 +98,9 @@ unit = fst . splitUnit
 valuation :: Padic n => n -> Int
 valuation = snd . splitUnit
 
+norm :: (Fractional f, Padic n) => n -> f
+norm n = radix n ^ (- valuation n)
+
 ------------------------------------------------------------
 instance (KnownNat p, ValidRadix p) => Digital (Mod p) where
   type Digits (Mod p) = Mod p
@@ -164,20 +165,18 @@ instance Radix p => Digital (Z p) where
 liftDigits :: Radix p => Digits (Z p) -> LiftedDigits p
 liftDigits ds = res
   where
-    res = Lifted . fromIntegral <$> unfoldr go ds
+    res = unfoldr go ds
     go xs =
-      let (a, r) = splitAt k xs
-       in Just (fromRadix p (unMod <$> a), r)
-    k = ilog p pk
+      let (a, r) = splitAt (ilog p pk) xs
+       in Just (fromIntegral $ fromRadix p (unMod <$> a), r)
     p = radix (head ds)
     pk = radix (head res)
 
 unliftDigits :: Radix p => LiftedDigits p -> Digits (Z p)
 unliftDigits ds = res
   where
-    res = concatMap (take k . expand) (unMod . unlift <$> ds)
+    res = concatMap (take (ilog p pk) . expand) (unMod . unlift <$> ds)
     expand d = fromIntegral <$> (toRadix p d ++ repeat 0)
-    k = ilog p pk
     p = radix (head res)
     pk = radix (head ds)
 
@@ -219,18 +218,21 @@ negZ = go
 
 -- выделяет из натурального числа перенос на следующий разряд
 carry :: (Integral a, Digital b, Num b) => a -> (a, b)
+{-# INLINE carry #-}
 carry n =
   let d = fromIntegral n
    in (n `div` radix d, d)
 
 -- поразрядное сложение с переносом
 addZ :: Radix p => LiftedDigits p -> LiftedDigits p -> LiftedDigits p
+{-# INLINE addZ #-}
 addZ a b = snd $ mapAccumL step 0 $ zip a b
   where
     step r (x, y) = carry (fromIntegral x + fromIntegral y + r)
 
 -- поразрядное умножение с переносом
 mulZ :: Radix p => LiftedDigits p -> LiftedDigits p -> LiftedDigits p
+{-# INLINE mulZ #-}
 mulZ a = go
   where
     go (b:bs) = addZ (go bs) `apTail` scaleZ b a
@@ -238,6 +240,7 @@ mulZ a = go
 
 -- поразрядное умножение на цифру с переносом
 scaleZ :: Radix p => Lifted p -> LiftedDigits p -> LiftedDigits p
+{-# INLINE scaleZ #-}
 scaleZ s =
   snd . mapAccumL (\r x -> carry (fromIntegral s * fromIntegral x + r)) 0
 
@@ -279,7 +282,7 @@ instance (KnownNat prec, Radix p) => Padic (Z' p prec) where
           _ -> (fromDigits xs, prec - k)
 
 instance (KnownNat prec, Radix p) => Eq (Z' p prec) where
-  a == b = take pr (digits a) == take pr (digits b)
+  a == b = and $ take pr $ zipWith (==) (digits a) (digits b)
     where
       pr = precision a
 
@@ -358,3 +361,95 @@ findCycle len lst =
         (x, c:cs)
           | all (c ==) cs -> (x, [c])
         other -> other
+
+------------------------------------------------------------
+------------------------------------------------------------
+
+data Q (p :: Nat) = Zero | Q Int (Z p)
+
+newtype Q' (p :: Nat) (prec :: Nat) = Q' (Q p)
+
+deriving via Q p instance Radix p => Digital (Q' p prec)
+
+deriving via (Q' p 20) instance Radix p => Eq (Q p)
+
+deriving via (Q' p 20) instance Radix p => Ord (Q p)
+
+deriving via (Q' p 20) instance Radix p => Show (Q p)
+
+deriving via (Q' p 20) instance Radix p => Num (Q p)
+
+deriving via (Q' p 20) instance Radix p => Enum (Q p)
+
+deriving via (Q' p 20) instance Radix p => Real (Q p)
+
+deriving via (Q' p 20) instance Radix p => Integral (Q p)
+
+deriving via (Q' p 20) instance Radix p => Padic (Q p)
+
+instance (KnownNat prec, Radix p) => Show (Q' p prec) where
+  show (Q' Zero) = "0.0"
+  show n = ell ++ zer si ++ "." ++ zer sf
+    where
+      p = precision n
+      k = valuation n    
+      ds = take (precision n - k) (digits n)
+      (f, i) = splitAt (-k) ds
+      sf = intercalate sep $ map show $ reverse f
+      li = dropWhile (== 0) $ reverse i ++ replicate k 0
+      si = intercalate sep $ map show li
+      zer s = if null s then "0" else s   
+      sep = if radix n < 11 then "" else " "   
+      ell = if length li < p then "" else "…"
+
+instance Radix p => Digital (Q p) where
+  type Digits (Q p) = Digits (Z p)
+  radix = fromIntegral . natVal
+
+  digits = \case
+    Zero -> repeat 0
+    Q _ u -> digits u
+  
+  fromDigits ds = Q 0 (fromDigits ds)
+
+normalize :: (KnownNat prec, Radix p) => Q' p prec -> Q' p prec
+normalize (Q' Zero) = Q' Zero
+normalize n = Q' $ go 0 (digits n)
+  where
+    go i _ | i > precision n = 0
+    go i (0 : u) = go (i+1) u
+    go i u = Q (valuation n + i) (fromDigits u)
+
+instance (KnownNat prec, Radix p) => Eq (Q' p prec) where
+  a == b = valuation a == valuation b
+           && and (take pr $ zipWith (==) (digits a) (digits b))
+    where
+      pr = precision a
+
+instance (KnownNat prec, Radix p) => Ord (Q' p prec) where
+  compare = error "ordering is not defined for Q"
+
+instance (KnownNat prec, Radix p) => Padic (Q' p prec) where
+  precision = fromIntegral . natVal
+  splitUnit (Q' Zero) = (Q' Zero, 0)
+  splitUnit (Q' (Q v u)) = (Q' (Q 0 u), v)
+
+instance (KnownNat prec, Radix p) => Num (Q' p prec) where
+  fromInteger 0 = Q' Zero
+  fromInteger n = normalize $ Q' $ Q 0 (fromInteger n)
+
+instance (KnownNat prec, Radix p) => Enum (Q' p prec) where
+  toEnum = fromIntegral
+  fromEnum = fromIntegral . toInteger
+
+instance (KnownNat prec, Radix p) => Real (Q' p prec) where
+  toRational = fromIntegral . toInteger
+
+instance (KnownNat prec, Radix p) => Integral (Q' p prec) where
+  toInteger n = toInteger (unit n) * norm n
+
+  div = undefined
+    
+  quotRem = error "quotRem is not defined fo p-adics"
+  divMod  = error "divMod is not defined fo p-adics"
+  mod     = error "divMod is not defined fo p-adics"
