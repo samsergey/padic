@@ -8,6 +8,7 @@ Stability   : experimental
 Portability : POSIX
 
 -}
+
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -23,9 +24,7 @@ Portability : POSIX
 module Padic
   ( Radix
   , Digital
-  , radix
-  , digits
-  , fromDigits
+  , radix, digits, fromDigits
   , Padic
   , splitUnit
   , unit
@@ -38,9 +37,11 @@ module Padic
   ) where
 
 import Data.Constraint (Constraint)
+import Data.InfList (InfList(..), (+++))
+import qualified Data.InfList as Inf
 import Data.List
-import Data.Maybe
 import Data.Mod
+import Data.Maybe
 import GHC.TypeLits hiding (Mod)
 
 ------------------------------------------------------------
@@ -109,12 +110,11 @@ instance (KnownNat p, ValidRadix p) => Digital (Mod p) where
 
 type LiftedRadix p = p ^ (Lg p (2 ^ 64) - 1)
 
-newtype Lifted p =
-  Lifted
-    { unlift :: Mod (LiftedRadix p)
-    }
+-- | Type for a radix p lifted to power k so that p^k fits to 'Word32'
+newtype Lifted p = Lifted { unlift :: Mod (LiftedRadix p) }
 
-deriving via Mod (LiftedRadix p) instance Radix p => Show (Lifted p)
+deriving via Mod (LiftedRadix p) instance
+         Radix p => Show (Lifted p)
 
 deriving via Mod (LiftedRadix p) instance Radix p => Eq (Lifted p)
 
@@ -122,9 +122,11 @@ deriving via Mod (LiftedRadix p) instance Radix p => Ord (Lifted p)
 
 deriving via Mod (LiftedRadix p) instance Radix p => Num (Lifted p)
 
-deriving via Mod (LiftedRadix p) instance Radix p => Enum (Lifted p)
+deriving via Mod (LiftedRadix p) instance
+         Radix p => Enum (Lifted p)
 
-deriving via Mod (LiftedRadix p) instance Radix p => Digital (Lifted p)
+deriving via Mod (LiftedRadix p) instance
+         Radix p => Digital (Lifted p)
 
 instance Radix p => Real (Lifted p) where
   toRational = undefined
@@ -134,7 +136,7 @@ instance Radix p => Integral (Lifted p) where
   quotRem = undefined
 
 -- | Alias for an infinite list of lifted digits
-type LiftedDigits p = [Lifted p]
+type LiftedDigits p = InfList (Lifted p)
 
 ------------------------------------------------------------
 -- |  Integer p-adic number with 20 digits precision
@@ -156,7 +158,7 @@ deriving via (Z' p 20) instance Radix p => Integral (Z p)
 deriving via (Z' p 20) instance Radix p => Padic (Z p)
 
 instance Radix p => Digital (Z p) where
-  type Digits (Z p) = [Mod p]
+  type Digits (Z p) = InfList (Mod p)
   radix = fromIntegral . natVal
   digits (Z n) = unliftDigits n
   fromDigits = Z . liftDigits
@@ -164,22 +166,22 @@ instance Radix p => Digital (Z p) where
 liftDigits :: Radix p => Digits (Z p) -> LiftedDigits p
 liftDigits ds = res
   where
-    res = Lifted . fromIntegral <$> unfoldr go ds
+    res = Lifted . fromIntegral <$> Inf.unfoldr go ds
     go xs =
-      let (a, r) = splitAt k xs
-       in Just (fromRadix p (unMod <$> a), r)
+      let (a, r) = Inf.splitAt k xs
+       in (fromRadix p (unMod <$> a), r)
     k = ilog p pk
-    p = radix (head ds)
-    pk = radix (head res)
+    p  = radix (Inf.head ds)
+    pk = radix (Inf.head res)
 
 unliftDigits :: Radix p => LiftedDigits p -> Digits (Z p)
 unliftDigits ds = res
   where
-    res = concatMap (take k . expand) (unMod . unlift <$> ds)
+    res = Inf.concatMap (take k . expand) (unMod . unlift <$> ds)
     expand d = fromIntegral <$> (toRadix p d ++ repeat 0)
     k = ilog p pk
-    p = radix (head res)
-    pk = radix (head ds)
+    p = radix (Inf.head res)
+    pk = radix (Inf.head ds)
 
 ilog :: (Integral b, Integral a, Integral a) => a -> a -> b
 ilog a b = floor (logBase (fromIntegral a) (fromIntegral b))
@@ -187,9 +189,9 @@ ilog a b = floor (logBase (fromIntegral a) (fromIntegral b))
 instance Radix p => Num (Z p) where
   fromInteger n
     | n < 0 = -fromInteger (-n)
-    | otherwise = Z $ d : ds
+    | otherwise = Z $ d ::: ds
     where
-      d:ds = toRadix (radix d) n ++ repeat 0
+      d ::: ds = toRadix (radix d) n +++ Inf.repeat 0
   abs = id
   signum 0 = 0
   signum _ = 1
@@ -214,8 +216,8 @@ fromRadix b = foldr (\x r -> fromIntegral x + r * b) 0
 negZ :: Radix p => LiftedDigits p -> LiftedDigits p
 negZ = go
   where
-    go (0:t) = 0 : go t
-    go (h:t) = -h : map (\x -> -x - 1) t
+    go (0 ::: t) = 0 ::: go t
+    go (h ::: t) = -h ::: Inf.map (\x -> -x - 1) t
 
 -- выделяет из натурального числа перенос на следующий разряд
 carry :: (Integral a, Digital b, Num b) => a -> (a, b)
@@ -225,7 +227,7 @@ carry n =
 
 -- поразрядное сложение с переносом
 addZ :: Radix p => LiftedDigits p -> LiftedDigits p -> LiftedDigits p
-addZ a b = snd $ mapAccumL step 0 $ zip a b
+addZ a b = Inf.mapAccumL step 0 $ Inf.zip a b
   where
     step r (x, y) = carry (fromIntegral x + fromIntegral y + r)
 
@@ -233,27 +235,26 @@ addZ a b = snd $ mapAccumL step 0 $ zip a b
 mulZ :: Radix p => LiftedDigits p -> LiftedDigits p -> LiftedDigits p
 mulZ a = go
   where
-    go (b:bs) = addZ (go bs) `apTail` scaleZ b a
-    apTail f (h:t) = h : f t
+    go (b ::: bs) = addZ (go bs) `apTail` scaleZ b a
+    apTail f (h ::: t) = h ::: f t
 
 -- поразрядное умножение на цифру с переносом
 scaleZ :: Radix p => Lifted p -> LiftedDigits p -> LiftedDigits p
-scaleZ s =
-  snd . mapAccumL (\r x -> carry (fromIntegral s * fromIntegral x + r)) 0
+scaleZ s = Inf.mapAccumL (\r x -> carry (fromIntegral s * fromIntegral x + r)) 0
 
 divMaybe :: Radix p => Z p -> Z p -> Maybe (Z p)
 divMaybe (Z a) (Z b) = Z <$> divZ a b
 
 -- поразрядное деление двух чисел "уголком"
 divZ :: Radix p => LiftedDigits p -> LiftedDigits p -> Maybe (LiftedDigits p)
-divZ a (b:bs) = go a <$ invert b
+divZ a (b ::: bs) = go a <$ invert b
   where
     Just r = invert b
-    go (0:xs) = 0 : go xs
+    go (0 ::: xs) = 0 ::: go xs
     go xs =
-      let m = head xs * r
+      let m = Inf.head xs * r
           mulAndSub = addZ xs . negZ . scaleZ m
-       in m : go (tail $ mulAndSub (b : bs))
+       in m ::: go (Inf.tail $ mulAndSub (b ::: bs))
 
 invert :: Radix p => Lifted p -> Maybe (Lifted p)
 invert (Lifted m) = Lifted <$> invertMod m
@@ -272,14 +273,14 @@ instance (KnownNat prec, Radix p) => Padic (Z' p prec) where
   splitUnit n = go prec (digits n)
     where
       prec = precision n
-      go 0 _ = (fromDigits $ repeat 0, maxBound)
+      go 0 _ = (fromDigits $ Inf.repeat 0, maxBound)
       go k xs =
         case xs of
-          0:ds -> go (k - 1) ds
+          0 ::: ds -> go (k - 1) ds
           _ -> (fromDigits xs, prec - k)
 
 instance (KnownNat prec, Radix p) => Eq (Z' p prec) where
-  a == b = take pr (digits a) == take pr (digits b)
+  a == b = Inf.take pr (digits a) == Inf.take pr (digits b)
     where
       pr = precision a
 
@@ -289,8 +290,8 @@ instance (KnownNat prec, Radix p) => Ord (Z' p prec) where
 instance (KnownNat prec, Radix p) => Show (Z' p prec) where
   show 0 = "0"
   show n =
-    case findCycle pr (digits n) of
-      (pref, []) -> "…" ++ toString pref
+    case findCycle pr (Inf.toList $ digits n) of
+      (pref, [])  -> "…" ++ toString pref
       (pref, [0]) -> toString pref
       (pref, cyc)
         | length pref + length cyc <= pr ->
@@ -323,14 +324,17 @@ instance (KnownNat prec, Radix p) => Integral (Z' p prec) where
     where
       prec = precision n
       p = radix n
-      ds = map (fromIntegral . unMod) $ digits n
-  div (Z' a) d@(Z' b) =
-    case divMaybe a b of
-      Just r -> Z' r
-      Nothing ->
-        error $ show d ++ " is indivisible in " ++ show (radix d) ++ "-adics!"
+      ds = map (fromIntegral . unMod) . Inf.toList $ digits n
+      
+  div (Z' a) d@(Z' b) = case divMaybe a b of
+    Just r -> Z' r
+    Nothing ->
+      error $ show d ++ " is indivisible in " ++ show (radix d) ++ "-adics!"
+
   quot = div
+      
   quotRem = error "modular arithmetic is not defined for p-adics!"
+
 
 findCycle :: Eq a => Int -> [a] -> ([a], [a])
 findCycle len lst =

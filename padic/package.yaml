@@ -23,6 +23,7 @@ dependencies:
  - base >= 4.7 && < 5
  - constraints >= 0.13.2
  - inflist
+ - integer-gmp
  - mod
  - hspec
  - QuickCheck
@@ -46,15 +47,15 @@ tests:
     other-modules:
       - ZSpec
 
-# benchmarks:
-#   criterion-benchmarks:
-#     dependencies:
-#       - criterion
-#       - padic
-#     ghc-options:
-#       - -O2
-#       - -threaded
-#       - -rtsopts
-#       - -with-rtsopts=-N
-#     main: BenchT.hs
-#     source-dirs: bench
+benchmarks:
+  criterion-benchmarks:
+    dependencies:
+      - criterion
+      - padic
+    ghc-options:
+      - -O2
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    main: Bench.hs
+    source-dirs: bench

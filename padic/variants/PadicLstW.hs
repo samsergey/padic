@@ -20,9 +20,10 @@ Portability : POSIX
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE LambdaCase #-}
 
-module Padic
+module PadicLstW
   ( Radix
   , Digital
+  , Digit
   , radix
   , digits
   , fromDigits
@@ -40,8 +41,9 @@ module Padic
 import Data.Constraint (Constraint)
 import Data.List
 import Data.Maybe
-import Data.Mod
-import GHC.TypeLits hiding (Mod)
+import Data.Word
+import GHC.TypeLits
+import GHC.Integer.GMP.Internals
 
 ------------------------------------------------------------
 -- | Constraint for non-zero natural number which can be a radix.
@@ -51,7 +53,9 @@ type family ValidRadix (m :: Nat) :: Constraint where
 
 -- | Naive type-level log function.
 type family Lg p n where
-  Lg p 0 = 0
+  Lg 2 1 = 0
+  Lg 2 n = Log2 n
+  Lg p 1 = 0
   Lg p n = Lg p (Div n p) + 1
 
 -- | Constraint for valid radix of a number
@@ -101,37 +105,27 @@ valuation :: Padic n => n -> Int
 valuation = snd . splitUnit
 
 ------------------------------------------------------------
-instance (KnownNat p, ValidRadix p) => Digital (Mod p) where
-  type Digits (Mod p) = Mod p
+
+newtype Digit (p :: Nat) = Digit { unMod :: Word64 }
+  deriving (Show, Num, Eq, Ord, Bounded, Enum, Real, Integral) via Word64
+
+instance (KnownNat p, ValidRadix p) => Digital (Digit p) where
+  type Digits (Digit p) = Digit p
   digits = id
   fromDigits = id
   radix = fromIntegral . natVal
 
 type LiftedRadix p = p ^ (Lg p (2 ^ 64) - 1)
 
+-- | Type for a radix p lifted to power k so that p^k fits to 'Word32'
 newtype Lifted p =
   Lifted
-    { unlift :: Mod (LiftedRadix p)
+    { unlift :: Digit (LiftedRadix p)
     }
+  deriving (Show, Num, Eq, Ord, Bounded, Enum, Real, Integral) via Word64
 
-deriving via Mod (LiftedRadix p) instance Radix p => Show (Lifted p)
-
-deriving via Mod (LiftedRadix p) instance Radix p => Eq (Lifted p)
-
-deriving via Mod (LiftedRadix p) instance Radix p => Ord (Lifted p)
-
-deriving via Mod (LiftedRadix p) instance Radix p => Num (Lifted p)
-
-deriving via Mod (LiftedRadix p) instance Radix p => Enum (Lifted p)
-
-deriving via Mod (LiftedRadix p) instance Radix p => Digital (Lifted p)
-
-instance Radix p => Real (Lifted p) where
-  toRational = undefined
-
-instance Radix p => Integral (Lifted p) where
-  toInteger = fromIntegral . unMod . unlift
-  quotRem = undefined
+deriving via Digit (LiftedRadix p) instance
+         Radix p => Digital (Lifted p)
 
 -- | Alias for an infinite list of lifted digits
 type LiftedDigits p = [Lifted p]
@@ -156,7 +150,7 @@ deriving via (Z' p 20) instance Radix p => Integral (Z p)
 deriving via (Z' p 20) instance Radix p => Padic (Z p)
 
 instance Radix p => Digital (Z p) where
-  type Digits (Z p) = [Mod p]
+  type Digits (Z p) = [Digit p]
   radix = fromIntegral . natVal
   digits (Z n) = unliftDigits n
   fromDigits = Z . liftDigits
@@ -215,19 +209,22 @@ negZ :: Radix p => LiftedDigits p -> LiftedDigits p
 negZ = go
   where
     go (0:t) = 0 : go t
-    go (h:t) = -h : map (\x -> -x - 1) t
+    go (h:t) = radix h - h : map (\x -> radix h - x - 1) t
 
 -- выделяет из натурального числа перенос на следующий разряд
 carry :: (Integral a, Digital b, Num b) => a -> (a, b)
 carry n =
-  let d = fromIntegral n
-   in (n `div` radix d, d)
+  (n `div` b, d)
+  where
+    b = radix d
+    d = fromIntegral (n `mod` b)
 
 -- поразрядное сложение с переносом
 addZ :: Radix p => LiftedDigits p -> LiftedDigits p -> LiftedDigits p
 addZ a b = snd $ mapAccumL step 0 $ zip a b
   where
-    step r (x, y) = carry (fromIntegral x + fromIntegral y + r)
+    step r (x, y)
+      = carry (fromIntegral x + fromIntegral y + r)
 
 -- поразрядное умножение с переносом
 mulZ :: Radix p => LiftedDigits p -> LiftedDigits p -> LiftedDigits p
@@ -251,12 +248,18 @@ divZ a (b:bs) = go a <$ invert b
     Just r = invert b
     go (0:xs) = 0 : go xs
     go xs =
-      let m = head xs * r
+      let m = (head xs * r) `mod` radix b
           mulAndSub = addZ xs . negZ . scaleZ m
        in m : go (tail $ mulAndSub (b : bs))
 
 invert :: Radix p => Lifted p -> Maybe (Lifted p)
 invert (Lifted m) = Lifted <$> invertMod m
+  where
+    p = radix m
+    invertMod (Digit x)
+      | gcd p x == 1
+        = Just $ Digit $ fromIntegral $ recipModInteger (fromIntegral x) (radix m)
+      | otherwise = Nothing
 
 ------------------------------------------------------------
 -- |  Integer p-adic number with explicitly specified precision

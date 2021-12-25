@@ -36,6 +36,7 @@ library
     , constraints >=0.13.2
     , hspec
     , inflist
+    , integer-gmp
     , mod
   default-language: Haskell2010
 
@@ -53,6 +54,27 @@ test-suite padic-test
     , constraints >=0.13.2
     , hspec
     , inflist
+    , integer-gmp
+    , mod
+    , padic
+  default-language: Haskell2010
+
+benchmark criterion-benchmarks
+  type: exitcode-stdio-1.0
+  main-is: Bench.hs
+  other-modules:
+      Paths_padic
+  hs-source-dirs:
+      bench
+  ghc-options: -O2 -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      QuickCheck
+    , base >=4.7 && <5
+    , constraints >=0.13.2
+    , criterion
+    , hspec
+    , inflist
+    , integer-gmp
     , mod
     , padic
   default-language: Haskell2010
