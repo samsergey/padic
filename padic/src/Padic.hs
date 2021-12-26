@@ -1,23 +1,21 @@
-{-|
-Module      : Padic
-Description : Representation a nd simple algebra for p-adic numbers.
-Copyright   : (c) Sergey Samoylenko, 2021
-License     : GPL-3
-Maintainer  : samsergey@yandex.ru
-Stability   : experimental
-Portability : POSIX
--}
-
-{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE LambdaCase #-}
 
+-- |
+-- Module      : Padic
+-- Description : Representation a nd simple algebra for p-adic numbers.
+-- Copyright   : (c) Sergey Samoylenko, 2021
+-- License     : GPL-3
+-- Maintainer  : samsergey@yandex.ru
+-- Stability   : experimental
+-- Portability : POSIX
 module Padic
   ( Radix
   , Digital
@@ -28,20 +26,23 @@ module Padic
   , splitUnit
   , unit
   , valuation
+  , norm
   , Digits
   , LiftedDigits
   , Z
   , Z'
+  , Q
+  , Q'
   , divMaybe
   ) where
 
 import Data.Constraint (Constraint)
 import Data.List
-import Data.Maybe
+import Data.Maybe (listToMaybe)
 import Data.Mod
 import Data.Ratio
-import GHC.TypeLits hiding (Mod)
 import GHC.Prim (coerce)
+import GHC.TypeLits hiding (Mod)
 
 ------------------------------------------------------------
 -- | Constraint for non-zero natural number which can be a radix.
@@ -63,10 +64,14 @@ type Radix m
 
 ------------------------------------------------------------
 -- | Typeclass for digitally representable objects
-class Digital n where
-  type Digits n -- ^ a digit or a list of digits
-  fromDigits :: Digits n -> n -- ^ constructs a number from digits
-  digits :: n -> Digits n -- ^ returns digits of a number
+class Digital n
+  -- | a digit or a list of digits
+  where
+  type Digits n
+  -- | constructs a number from digits
+  fromDigits :: Digits n -> n
+  -- | returns digits of a number
+  digits :: n -> Digits n
   -- | Returns the radix of a number
   --
   -- >>> radix (5 :: Z 13)
@@ -74,12 +79,17 @@ class Digital n where
   radix :: Integral i => n -> i
 
 -- | Typeclass for p-adic numbers
-class Digital n => Padic n where
-  type Unit n
-  precision :: Integral i => n -> i -- ^ returns precision a number
-  splitUnit :: n -> (Unit n, Int) -- ^ returns valuation and unit of a number
+class Digital n =>
+      Padic n
+  where
+  type Unit n -- ^ a type for p-adic unit
+  -- | returns precision a number
+  precision :: Integral i => n -> i
+  -- | returns valuation and unit of a number
+  splitUnit :: n -> (Unit n, Int)
+  -- | adjusts unit and valuation of number
   normalize :: n -> n
-  
+
 -- | returns the unit of a number
 --
 -- >>> unit (120 :: Z 10)
@@ -214,28 +224,24 @@ toRadix b n = unfoldr go n
 fromRadix :: (Integral i, Integral d) => i -> [d] -> i
 fromRadix b = foldr (\x r -> fromIntegral x + r * b) 0
 
--- смена знака на противоположный
 negZ :: Radix p => LiftedDigits p -> LiftedDigits p
 negZ = go
   where
     go (0:t) = 0 : go t
     go (h:t) = -h : map (\x -> -x - 1) t
 
--- выделяет из натурального числа перенос на следующий разряд
 carry :: (Integral a, Digital b, Num b) => a -> (a, b)
 {-# INLINE carry #-}
 carry n =
   let d = fromIntegral n
    in (n `div` radix d, d)
 
--- поразрядное сложение с переносом
 addZ :: Radix p => LiftedDigits p -> LiftedDigits p -> LiftedDigits p
 {-# INLINE addZ #-}
 addZ a b = snd $ mapAccumL step 0 $ zip a b
   where
     step r (x, y) = carry (fromIntegral x + fromIntegral y + r)
 
--- поразрядное умножение с переносом
 mulZ :: Radix p => LiftedDigits p -> LiftedDigits p -> LiftedDigits p
 {-# INLINE mulZ #-}
 mulZ a = go
@@ -243,7 +249,6 @@ mulZ a = go
     go (b:bs) = addZ (go bs) `apTail` scaleZ b a
     apTail f (h:t) = h : f t
 
--- поразрядное умножение на цифру с переносом
 scaleZ :: Radix p => Lifted p -> LiftedDigits p -> LiftedDigits p
 {-# INLINE scaleZ #-}
 scaleZ s =
@@ -252,7 +257,6 @@ scaleZ s =
 divMaybe :: Radix p => Z p -> Z p -> Maybe (Z p)
 divMaybe (Z a) (Z b) = Z <$> divZ a b
 
--- поразрядное деление двух чисел "уголком"
 divZ :: Radix p => LiftedDigits p -> LiftedDigits p -> Maybe (LiftedDigits p)
 divZ a (b:bs) = go a <$ invert b
   where
@@ -398,10 +402,11 @@ instance (KnownNat prec, Radix p) => Show (Q' p prec) where
       pr = precision n
       k = valuation n
       ds = digits n
-      (f, i) = case compare k 0 of
-        EQ -> ([0], ds)
-        GT -> ([0], replicate k 0 ++ ds)
-        LT -> splitAt (-k) ds
+      (f, i) =
+        case compare k 0 of
+          EQ -> ([0], ds)
+          GT -> ([0], replicate k 0 ++ ds)
+          LT -> splitAt (-k) ds
       sf = intercalate sep $ showD <$> reverse f
       si =
         case findCycle pr i of
@@ -425,17 +430,19 @@ instance (KnownNat prec, Radix p) => Digital (Q' p prec) where
   radix (Q' (Q _ n)) = radix n
   digits (Q' x) =
     case x of
-      Zero    -> repeat 0
+      Zero -> repeat 0
       (Q _ u) -> digits u
   fromDigits ds = Q' (Q 0 (fromDigits ds))
 
 instance (KnownNat prec, Radix p) => Padic (Q' p prec) where
   type Unit (Q' p prec) = Z' p prec
   precision = fromIntegral . natVal
-
-  splitUnit (Q' Zero) = (0, maxBound)
-  splitUnit (Q' (Q v u)) = (coerce u, v)
-
+  splitUnit n =
+    case n of
+      (Q' Zero) -> (0, precision n)
+      (Q' (Q v u))
+        | v > precision n -> (0, precision n)
+        | otherwise -> (coerce u, v)
   normalize (Q' Zero) = Q' Zero
   normalize n = Q' $ go 0 (digits n)
     where
@@ -447,10 +454,8 @@ instance (KnownNat prec, Radix p) => Padic (Q' p prec) where
 instance Radix p => Padic (Q p) where
   type Unit (Q p) = Z p
   precision _ = 20
-
-  splitUnit Zero = (0, maxBound)
+  splitUnit Zero = (0, 20)
   splitUnit (Q v u) = (u, v)
-
   normalize Zero = Zero
   normalize n = go 0 (digits n)
     where
@@ -459,13 +464,11 @@ instance Radix p => Padic (Q p) where
       go i (0:u) = go (i + 1) u
       go i u = Q (valuation n + i) (fromDigits u)
 
-
 instance (KnownNat prec, Radix p) => Eq (Q' p prec) where
-  a == b =
-    valuation a == valuation b &&
-    and (take pr $ zipWith (==) (digits a) (digits b))
-    where
-      pr = precision a
+  (==) = equiv
+
+equiv :: (Padic n, Eq (Unit n)) => n -> n -> Bool
+equiv a b = abs (valuation a - valuation b) < precision a && unit a == unit b
 
 instance (KnownNat prec, Radix p) => Ord (Q' p prec) where
   compare = error "ordering is not defined for Q"
@@ -473,55 +476,55 @@ instance (KnownNat prec, Radix p) => Ord (Q' p prec) where
 instance Radix p => Num (Q p) where
   fromInteger 0 = Zero
   fromInteger n = normalize $ Q 0 (fromInteger n)
-
+                                
   Zero + a = a
   a + Zero = a
-  a + b = Q v (p ^ (va - v) * unit a + p ^ (vb - v) * unit b)
+  a + b = normalize $ Q v (p ^ (va - v) * unit a + p ^ (vb - v) * unit b)
     where
       va = valuation a
       vb = valuation b
       v = va `min` vb
       p = radix a
-
+                
   Zero * _ = Zero
   _ * Zero = Zero
-  a * b = Q (valuation a + valuation b) (unit a * unit b)
-
+  a * b = normalize $ Q (valuation a + valuation b) (unit a * unit b)
+                        
   negate Zero = Zero
   negate (Q v u) = Q v (negate u)
-
+                     
   abs = id
-
+    
   signum Zero = 0
   signum _ = 1
 
-instance Radix p => Fractional (Q p)  where
+instance Radix p => Fractional (Q p) where
   fromRational 0 = Zero
-  fromRational x = normalize res 
+  fromRational x = normalize res
     where
       res = Q v (fromDigits (series n))
       p = radix res
       (v, q) = getUnit p x
-      (n, d) = ( fromIntegral $ numerator q
-               , fromIntegral $ denominator q)
+      (n, d) = (fromIntegral $ numerator q, fromIntegral $ denominator q)
       series 0 = repeat 0
       series n =
         let m = fromIntegral n / fromIntegral d
-        in m : series ((n - fromIntegral (unMod m) * d) `div` p)
+         in m : series ((n - fromIntegral (unMod m) * d) `div` p)
 
-  a / b = Q (valuation a - valuation b) res
+  a / b = normalize $ Q (valuation a - valuation b) res
     where
       res =
         case divMaybe (unit a) (unit b) of
           Nothing ->
-            error $ show b ++ " is indivisible in " ++ show (radix a) ++ "-adics!"
+            error $
+            show b ++ " is indivisible in " ++ show (radix a) ++ "-adics!"
           Just r -> r
 
 -- extracts p-adic unit from a rational number
 getUnit :: Integral i => i -> Ratio i -> (Int, Ratio i)
-getUnit p x = (genericLength v2 - genericLength v1, c) 
+getUnit p x = (genericLength v2 - genericLength v1, c)
   where
-    (v1,b:_) = span (\n -> denominator n `mod` p == 0) $
-               iterate (* fromIntegral p) x
-    (v2,c:_) = span (\n -> numerator n `mod` p == 0) $
-               iterate (/ fromIntegral p) b
+    (v1, b:_) =
+      span (\n -> denominator n `mod` p == 0) $ iterate (* fromIntegral p) x
+    (v2, c:_) =
+      span (\n -> numerator n `mod` p == 0) $ iterate (/ fromIntegral p) b
