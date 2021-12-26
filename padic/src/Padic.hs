@@ -6,8 +6,8 @@ License     : GPL-3
 Maintainer  : samsergey@yandex.ru
 Stability   : experimental
 Portability : POSIX
-
 -}
+
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -39,7 +39,9 @@ import Data.Constraint (Constraint)
 import Data.List
 import Data.Maybe
 import Data.Mod
+import Data.Ratio
 import GHC.TypeLits hiding (Mod)
+import GHC.Prim (coerce)
 
 ------------------------------------------------------------
 -- | Constraint for non-zero natural number which can be a radix.
@@ -377,23 +379,17 @@ data Q (p :: Nat)
 newtype Q' (p :: Nat) (prec :: Nat) =
   Q' (Q p)
 
-deriving via Q p instance Radix p => Digital (Q' p prec)
-
 deriving via Q p instance Radix p => Num (Q' p prec)
+
+deriving via Q p instance Radix p => Fractional (Q' p prec)
+
+deriving via (Q' p 20) instance Radix p => Digital (Q p)
 
 deriving via (Q' p 20) instance Radix p => Eq (Q p)
 
 deriving via (Q' p 20) instance Radix p => Ord (Q p)
 
 deriving via (Q' p 20) instance Radix p => Show (Q p)
-
-deriving via (Q' p 20) instance Radix p => Enum (Q p)
-
-deriving via (Q' p 20) instance Radix p => Real (Q p)
-
-deriving via (Q' p 20) instance Radix p => Integral (Q p)
-
-deriving via (Q' p 20) instance Radix p => Padic (Q p)
 
 instance (KnownNat prec, Radix p) => Show (Q' p prec) where
   show (Q' Zero) = "0.0"
@@ -402,13 +398,14 @@ instance (KnownNat prec, Radix p) => Show (Q' p prec) where
       pr = precision n
       k = valuation n
       ds = digits n
-      (i, f)
-        | k == 0 = (ds, [0])
-        | k > 0 = (replicate k 0 ++ ds, [0])
-        | otherwise = splitAt (-k) ds
+      (f, i) = case compare k 0 of
+        EQ -> ([0], ds)
+        GT -> ([0], replicate k 0 ++ ds)
+        LT -> splitAt (-k) ds
       sf = intercalate sep $ showD <$> reverse f
       si =
         case findCycle pr i of
+          ([], [0]) -> "0"
           (pref, []) -> "…" ++ toString pref
           (pref, [0]) -> toString pref
           (pref, cyc)
@@ -423,14 +420,45 @@ instance (KnownNat prec, Radix p) => Show (Q' p prec) where
         | radix n < 11 = ""
         | otherwise = " "
 
-instance Radix p => Digital (Q p) where
-  type Digits (Q p) = Digits (Z p)
-  radix = fromIntegral . natVal
-  digits =
-    \case
-      Zero -> repeat 0
-      Q _ u -> digits u
-  fromDigits ds = Q 0 (fromDigits ds)
+instance (KnownNat prec, Radix p) => Digital (Q' p prec) where
+  type Digits (Q' p prec) = Digits (Z' p prec)
+  radix (Q' (Q _ n)) = radix n
+  digits (Q' x) =
+    case x of
+      Zero    -> repeat 0
+      (Q _ u) -> digits u
+  fromDigits ds = Q' (Q 0 (fromDigits ds))
+
+instance (KnownNat prec, Radix p) => Padic (Q' p prec) where
+  type Unit (Q' p prec) = Z' p prec
+  precision = fromIntegral . natVal
+
+  splitUnit (Q' Zero) = (0, maxBound)
+  splitUnit (Q' (Q v u)) = (coerce u, v)
+
+  normalize (Q' Zero) = Q' Zero
+  normalize n = Q' $ go 0 (digits n)
+    where
+      go i _
+        | i > precision n = 0
+      go i (0:u) = go (i + 1) u
+      go i u = Q (valuation n + i) (fromDigits u)
+
+instance Radix p => Padic (Q p) where
+  type Unit (Q p) = Z p
+  precision _ = 20
+
+  splitUnit Zero = (0, maxBound)
+  splitUnit (Q v u) = (u, v)
+
+  normalize Zero = Zero
+  normalize n = go 0 (digits n)
+    where
+      go i _
+        | i > 20 = 0
+      go i (0:u) = go (i + 1) u
+      go i u = Q (valuation n + i) (fromDigits u)
+
 
 instance (KnownNat prec, Radix p) => Eq (Q' p prec) where
   a == b =
@@ -442,43 +470,58 @@ instance (KnownNat prec, Radix p) => Eq (Q' p prec) where
 instance (KnownNat prec, Radix p) => Ord (Q' p prec) where
   compare = error "ordering is not defined for Q"
 
-
-instance (KnownNat prec, Radix p) => Padic (Q' p prec) where
-  type Unit (Q' p prec) = Z p
-  precision = fromIntegral . natVal
-
-  splitUnit (Q' Zero) = (0, maxBound)
-  splitUnit (Q' (Q v u)) = (u, v)
-
-  normalize (Q' Zero) = Q' Zero
-  normalize n = Q' $ go 0 (digits n)
-    where
-      go i _
-        | i > precision n = 0
-      go i (0:u) = go (i + 1) u
-      go i u = Q (valuation n + i) (fromDigits u)
-
 instance Radix p => Num (Q p) where
   fromInteger 0 = Zero
   fromInteger n = normalize $ Q 0 (fromInteger n)
 
   Zero + a = a
   a + Zero = a
-  a + b = Q v s
+  a + b = Q v (p ^ (va - v) * unit a + p ^ (vb - v) * unit b)
     where
-      v = valuation a `min` valuation b
-      s = unit a + unit b
+      va = valuation a
+      vb = valuation b
+      v = va `min` vb
+      p = radix a
 
-instance (KnownNat prec, Radix p) => Enum (Q' p prec) where
-  toEnum = fromIntegral
-  fromEnum = fromIntegral . toInteger
+  Zero * _ = Zero
+  _ * Zero = Zero
+  a * b = Q (valuation a + valuation b) (unit a * unit b)
 
-instance (KnownNat prec, Radix p) => Real (Q' p prec) where
-  toRational = fromIntegral . toInteger
+  negate Zero = Zero
+  negate (Q v u) = Q v (negate u)
 
-instance (KnownNat prec, Radix p) => Integral (Q' p prec) where
-  toInteger n = toInteger (unit n) `div` (radix n ^ valuation n)
-  div = undefined
-  quotRem = error "quotRem is not defined fo p-adics"
-  divMod = error "divMod is not defined fo p-adics"
-  mod = error "divMod is not defined fo p-adics"
+  abs = id
+
+  signum Zero = 0
+  signum _ = 1
+
+instance Radix p => Fractional (Q p)  where
+  fromRational 0 = Zero
+  fromRational x = normalize res 
+    where
+      res = Q v (fromDigits (series n))
+      p = radix res
+      (v, q) = getUnit p x
+      (n, d) = ( fromIntegral $ numerator q
+               , fromIntegral $ denominator q)
+      series 0 = repeat 0
+      series n =
+        let m = fromIntegral n / fromIntegral d
+        in m : series ((n - fromIntegral (unMod m) * d) `div` p)
+
+  a / b = Q (valuation a - valuation b) res
+    where
+      res =
+        case divMaybe (unit a) (unit b) of
+          Nothing ->
+            error $ show b ++ " is indivisible in " ++ show (radix a) ++ "-adics!"
+          Just r -> r
+
+-- extracts p-adic unit from a rational number
+getUnit :: Integral i => i -> Ratio i -> (Int, Ratio i)
+getUnit p x = (genericLength v2 - genericLength v1, c) 
+  where
+    (v1,b:_) = span (\n -> denominator n `mod` p == 0) $
+               iterate (* fromIntegral p) x
+    (v2,c:_) = span (\n -> numerator n `mod` p == 0) $
+               iterate (/ fromIntegral p) b
