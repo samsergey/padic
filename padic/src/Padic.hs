@@ -17,22 +17,24 @@
 -- Stability   : experimental
 -- Portability : POSIX
 module Padic
-  ( Radix
+  ( -- * p-Adic integers
+    Z
+  , Z'
+   -- * p-Adic rationals
+  , Q
+  , Q'
+  -- * Classes and functions
+  , Radix
   , Digital
   , radix
   , digits
   , fromDigits
   , Padic
+  , precision
   , splitUnit
   , unit
   , valuation
   , norm
-  , Digits
-  , LiftedDigits
-  , Z
-  , Z'
-  , Q
-  , Q'
   , divMaybe
   ) where
 
@@ -48,25 +50,28 @@ import GHC.TypeLits hiding (Mod)
 -- | Constraint for non-zero natural number which can be a radix.
 type family ValidRadix (m :: Nat) :: Constraint where
   ValidRadix 0 = TypeError ('Text "Zero radix!")
+  ValidRadix 1 = TypeError ('Text "Radix should be more then 1!")
   ValidRadix m = ()
 
 -- | Naive type-level log function.
 type family Lg p n where
+  Lg 1 _ = TypeError ('Text "Radix should be more then 1!")
+  Lg 2 n = Log2 n
   Lg p 0 = 0
   Lg p n = Lg p (Div n p) + 1
 
 -- | Constraint for valid radix of a number
 type Radix m
-   = ( ValidRadix (LiftedRadix m)
+   = ( ValidRadix m
+     , KnownNat m
      , KnownNat (LiftedRadix m)
-     , ValidRadix m
-     , KnownNat m)
+     , ValidRadix (LiftedRadix m))
 
 ------------------------------------------------------------
 -- | Typeclass for digitally representable objects
 class Digital n
-  -- | a digit or a list of digits
   where
+  -- | a digit or a list of digits
   type Digits n
   -- | constructs a number from digits
   fromDigits :: Digits n -> n
@@ -82,7 +87,8 @@ class Digital n
 class Digital n =>
       Padic n
   where
-  type Unit n -- ^ a type for p-adic unit
+  -- | a type for p-adic unit
+  type Unit n 
   -- | returns precision a number
   precision :: Integral i => n -> i
   -- | returns valuation and unit of a number
@@ -112,6 +118,13 @@ valuation = snd . splitUnit
 
 norm :: (Fractional f, Padic n) => n -> f
 norm n = fromIntegral (radix n) ^^ (-valuation n)
+
+equiv :: (Padic n, Eq (Unit n)) => n -> n -> Bool
+equiv a b =
+  (isZero a && isZero b) || (valuation a == valuation b && unit a == unit b)
+
+isZero :: Padic n => n -> Bool
+isZero n = valuation n >= precision n
 
 ------------------------------------------------------------
 instance (KnownNat p, ValidRadix p) => Digital (Mod p) where
@@ -401,7 +414,7 @@ instance (KnownNat prec, Radix p) => Show (Q' p prec) where
     where
       pr = precision n
       k = valuation n
-      ds = digits n
+      ds = digits (unit n)
       (f, i) =
         case compare k 0 of
           EQ -> ([0], ds)
@@ -431,8 +444,8 @@ instance (KnownNat prec, Radix p) => Digital (Q' p prec) where
   digits (Q' x) =
     case x of
       Zero -> repeat 0
-      (Q _ u) -> digits u
-  fromDigits ds = Q' (Q 0 (fromDigits ds))
+      (Q v u) -> replicate v 0 ++ digits u
+  fromDigits ds = normalize $ Q' (Q 0 (fromDigits ds))
 
 instance (KnownNat prec, Radix p) => Padic (Q' p prec) where
   type Unit (Q' p prec) = Z' p prec
@@ -457,7 +470,7 @@ instance Radix p => Padic (Q p) where
   splitUnit Zero = (0, 20)
   splitUnit (Q v u) = (u, v)
   normalize Zero = Zero
-  normalize n = go 0 (digits n)
+  normalize n = go 0 (digits (unit n))
     where
       go i _
         | i > 20 = 0
@@ -467,16 +480,12 @@ instance Radix p => Padic (Q p) where
 instance (KnownNat prec, Radix p) => Eq (Q' p prec) where
   (==) = equiv
 
-equiv :: (Padic n, Eq (Unit n)) => n -> n -> Bool
-equiv a b = abs (valuation a - valuation b) < precision a && unit a == unit b
-
 instance (KnownNat prec, Radix p) => Ord (Q' p prec) where
   compare = error "ordering is not defined for Q"
 
 instance Radix p => Num (Q p) where
   fromInteger 0 = Zero
   fromInteger n = normalize $ Q 0 (fromInteger n)
-                                
   Zero + a = a
   a + Zero = a
   a + b = normalize $ Q v (p ^ (va - v) * unit a + p ^ (vb - v) * unit b)
@@ -485,16 +494,12 @@ instance Radix p => Num (Q p) where
       vb = valuation b
       v = va `min` vb
       p = radix a
-                
   Zero * _ = Zero
   _ * Zero = Zero
   a * b = normalize $ Q (valuation a + valuation b) (unit a * unit b)
-                        
   negate Zero = Zero
   negate (Q v u) = Q v (negate u)
-                     
   abs = id
-    
   signum Zero = 0
   signum _ = 1
 
@@ -510,7 +515,6 @@ instance Radix p => Fractional (Q p) where
       series n =
         let m = fromIntegral n / fromIntegral d
          in m : series ((n - fromIntegral (unMod m) * d) `div` p)
-
   a / b = normalize $ Q (valuation a - valuation b) res
     where
       res =

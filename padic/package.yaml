@@ -47,6 +47,7 @@ tests:
     - QuickCheck
     other-modules:
       - ZSpec
+      - QSpec
 
 benchmarks:
   criterion-benchmarks:
