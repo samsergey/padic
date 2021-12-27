@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingVia #-}
@@ -532,3 +533,15 @@ getUnit p x = (genericLength v2 - genericLength v1, c)
       span (\n -> denominator n `mod` p == 0) $ iterate (* fromIntegral p) x
     (v2, c:_) =
       span (\n -> numerator n `mod` p == 0) $ iterate (/ fromIntegral p) b
+
+toRat (Z (Lifted u:_)) = ratDecomposition (fromIntegral (unMod u)) (radix u)
+
+ratDecomposition :: Integer -> Integer -> Rational
+ratDecomposition n m = go (m,0) (n,1)
+  where
+    go (v1, v2) (w1, w2)
+      | w1 > isqrt m = let q = v1 `div` w1
+                       in go (w1, w2) (v1 - q*w1, v2 - q*w2)
+      | otherwise = w1 % w2
+
+isqrt n = floor (sqrt (fromIntegral n))
