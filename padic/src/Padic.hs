@@ -177,9 +177,8 @@ deriving via (Z' p 20) instance Radix p => Ord (Z p)
 
 deriving via (Z' p 20) instance Radix p => Show (Z p)
 
-deriving via (Z' p 20) instance Radix p => Enum (Z p)
-
 deriving via (Z' p 20) instance Radix p => Real (Z p)
+deriving via (Z' p 20) instance Radix p => Enum (Z p)
 
 deriving via (Z' p 20) instance Radix p => Integral (Z p)
 
@@ -283,6 +282,7 @@ divZ a (b:bs) = go a <$ invert b
 
 invert :: Radix p => Lifted p -> Maybe (Lifted p)
 invert (Lifted m) = Lifted <$> invertMod m
+  
 
 ------------------------------------------------------------
 -- |  Integer p-adic number with explicitly specified precision
@@ -338,8 +338,6 @@ instance (KnownNat prec, Radix p) => Enum (Z' p prec) where
   toEnum = fromIntegral
   fromEnum = fromIntegral . toInteger
 
-instance (KnownNat prec, Radix p) => Real (Z' p prec) where
-  toRational = fromIntegral . toInteger
 
 instance (KnownNat prec, Radix p) => Integral (Z' p prec) where
   toInteger n =
@@ -388,6 +386,27 @@ findCycle len lst =
           | all (c ==) cs -> (x, [c])
         other -> other
 
+instance (KnownNat prec, Radix p) => Real (Z' p prec) where
+  toRational 0 = 0
+  toRational x@(Z' (Z ds)) = ratDecomposition n m
+    where
+      prec = precision x
+      p = radix x
+      pk = radix (head ds)
+      m = p ^ prec
+      n = fromRadix pk (take (ilog pk m + 1) (unMod . unlift <$> ds))
+  
+ratDecomposition :: Integer -> Integer -> Rational
+ratDecomposition n m = go (m,0) (n,1)
+  where
+    go (v1, v2) (w1, w2)
+      | w1 > isqrt m = let q = v1 `div` w1
+                       in go (w1, w2) (v1 - q*w1, v2 - q*w2)
+      | otherwise = w1 % w2
+
+isqrt :: (Integral b, Integral a) => a -> b
+isqrt n = floor (sqrt (fromIntegral n))
+  
 ------------------------------------------------------------
 ------------------------------------------------------------
 data Q (p :: Nat)
@@ -401,13 +420,13 @@ deriving via Q p instance Radix p => Num (Q' p prec)
 
 deriving via Q p instance Radix p => Fractional (Q' p prec)
 
-deriving via (Q' p 20) instance Radix p => Digital (Q p)
-
 deriving via (Q' p 20) instance Radix p => Eq (Q p)
 
 deriving via (Q' p 20) instance Radix p => Ord (Q p)
 
 deriving via (Q' p 20) instance Radix p => Show (Q p)
+
+deriving via (Q' p 20) instance Radix p => Real (Q p)
 
 instance (KnownNat prec, Radix p) => Show (Q' p prec) where
   show (Q' Zero) = "0.0"
@@ -438,15 +457,37 @@ instance (KnownNat prec, Radix p) => Show (Q' p prec) where
       sep
         | radix n < 11 = ""
         | otherwise = " "
+  
+instance Radix p => Digital (Q p) where
+  type Digits (Q p) = Digits (Z p)
+  radix = fromIntegral . natVal
+  digits =
+    \case
+      Zero -> repeat 0
+      (Q v u) -> replicate v 0 ++ digits u
+  fromDigits ds = normalize $ Q 0 (fromDigits ds)
 
 instance (KnownNat prec, Radix p) => Digital (Q' p prec) where
   type Digits (Q' p prec) = Digits (Z' p prec)
-  radix (Q' (Q _ n)) = radix n
+  radix (Q' n) = radix n
   digits (Q' x) =
     case x of
       Zero -> repeat 0
       (Q v u) -> replicate v 0 ++ digits u
   fromDigits ds = normalize $ Q' (Q 0 (fromDigits ds))
+
+instance Radix p => Padic (Q p) where
+  type Unit (Q p) = Z p
+  precision _ = 20
+  splitUnit Zero = (0, 20)
+  splitUnit (Q v u) = (u, v)
+  normalize Zero = Zero
+  normalize n = go 0 (digits (unit n))
+    where
+      go i _
+        | i > 20 = 0
+      go i (0:u) = go (i + 1) u
+      go i u = Q (valuation n + i) (fromDigits u)
 
 instance (KnownNat prec, Radix p) => Padic (Q' p prec) where
   type Unit (Q' p prec) = Z' p prec
@@ -465,18 +506,6 @@ instance (KnownNat prec, Radix p) => Padic (Q' p prec) where
       go i (0:u) = go (i + 1) u
       go i u = Q (valuation n + i) (fromDigits u)
 
-instance Radix p => Padic (Q p) where
-  type Unit (Q p) = Z p
-  precision _ = 20
-  splitUnit Zero = (0, 20)
-  splitUnit (Q v u) = (u, v)
-  normalize Zero = Zero
-  normalize n = go 0 (digits (unit n))
-    where
-      go i _
-        | i > 20 = 0
-      go i (0:u) = go (i + 1) u
-      go i u = Q (valuation n + i) (fromDigits u)
 
 instance (KnownNat prec, Radix p) => Eq (Q' p prec) where
   (==) = equiv
@@ -534,14 +563,6 @@ getUnit p x = (genericLength v2 - genericLength v1, c)
     (v2, c:_) =
       span (\n -> numerator n `mod` p == 0) $ iterate (/ fromIntegral p) b
 
-toRat (Z (Lifted u:_)) = ratDecomposition (fromIntegral (unMod u)) (radix u)
-
-ratDecomposition :: Integer -> Integer -> Rational
-ratDecomposition n m = go (m,0) (n,1)
-  where
-    go (v1, v2) (w1, w2)
-      | w1 > isqrt m = let q = v1 `div` w1
-                       in go (w1, w2) (v1 - q*w1, v2 - q*w2)
-      | otherwise = w1 % w2
-
-isqrt n = floor (sqrt (fromIntegral n))
+instance (KnownNat prec, Radix p) => Real (Q' p prec) where
+  toRational (Q' Zero) = 0
+  toRational n = toRational (unit n) / norm n

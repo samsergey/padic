@@ -86,6 +86,10 @@ divMul a b = b /= 0 ==> (a / b) * b == a
 mulSign :: (Eq a, Num a) => a -> a -> Bool
 mulSign a b = and [a * (- b) == - (a * b), (- a) * (- b) == a * b]
 
+ratRec :: (Real a, Fractional a) => a -> Ratio Word -> Bool
+ratRec t r = let [_, x] = [t, fromRational (toRational r)]
+             in toRational x == toRational r
+
 plog p b
   | b `mod` p == 0 = 1 + plog p (b `div` p)
   | otherwise = 0
@@ -107,6 +111,9 @@ arbitraryQ = fromDigits <$> infiniteList
 
 instance Radix m => Arbitrary (Q m) where
   arbitrary = oneof [integerQ, rationalQ, arbitraryQ]
+
+test :: Spec
+test = it "ratRec" $ property $ ratRec (0 :: Q 2)
 
 spec :: Spec
 spec = do
