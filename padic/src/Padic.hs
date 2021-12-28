@@ -38,31 +38,29 @@
 -- (285714)3.0
 --
 --
--- The working precision of all p-adics is effetively infinite. However for textual output and rational reconstruction some finite precision should be specified. 
+-- The working precision of all p-adics is effetively infinite. However for textual output and rational reconstruction some finite precision should be specified.
 --
--- Rational decomposition is done using a method from Paul S. Wang. 
+-- Rational decomposition is done using a method from Paul S. Wang.
 -- For a truncated p-adic number \(x = \frac{r}{s}\) the equation
 -- \( x \cdot s \equiv r\ (\mathrm{mod}\ p^k)\) is solved by extended Euclidean method.
 -- The power \(k\) depends on the specifiied precision of a p-adic number and affects the upper bounds of numerator and denominator of the reconstructed rational.
---  
+--
 ------------------------------------------------------------
-
 module Padic
-  (
   -- * Classes and functions
   -- ** Type synonyms and constraints
-    ValidRadix
+  ( ValidRadix
   , LiftedRadix
   , Lifted
   , LiftedDigits
   , Radix
-  -- ** Digital objects 
+  -- ** Digital objects
   , Digital
   , Digits
   , radix
   , digits
   , fromDigits
-  -- ** p-adic numbers 
+  -- ** p-adic numbers
   , Padic
   , Unit
   , precision
@@ -78,9 +76,9 @@ module Padic
    -- ** p-Adic rationals
   , Q
   , Q'
-  -- | * Functions and utilities.
+  -- * Functions and utilities.
   , firstDigit
-  , isDivisible
+  , isInvertible
   , divMaybe
   , fromRadix
   , toRadix
@@ -145,7 +143,8 @@ instance (KnownNat p, ValidRadix p) => Digital (Mod p) where
 -- | Typeclass for p-adic numbers
 class Digital n => Padic n where
   -- | A type for p-adic unit.
-  type Unit n 
+  type Unit n
+  -- | A type for a sequence of lifted digits
   type LiftedDigits n
   -- | Returns the precision of a number.
   --
@@ -159,7 +158,7 @@ class Digital n => Padic n where
   -- | Adjusts unit and valuation of number removing leading zeros from the unit.
   normalize :: n -> n
   -- | Returns lifted digits
-  -- 
+  --
   -- >>> take 3 $ liftedDigits (123 :: Z 10)
   -- [(123 `modulo` 10000000000000000000),(0 `modulo` 10000000000000000000),(0 `modulo` 10000000000000000000)]
   -- >>> take 3 $ liftedDigits (-123 :: Z 2)
@@ -204,7 +203,7 @@ isZero n = valuation n >= precision n
 -- |
 -- In order to gain efficiency the p-adic number is internally
 -- represented as an infinite list of /lifted/ digits modulo \(p^k\), where \(k\) is
--- chosen so that each lifted digit fits in a 'Word'. 
+-- chosen so that each lifted digit fits in a 'Word'.
 --
 -- \[
 -- x = ...ddddddddddddddd_{(p)} =  ... \underbrace{ddddd}_k\,\underbrace{ddddd}_k\,\underbrace{ddddd}_k{}_{(p^k)}
@@ -214,9 +213,11 @@ isZero n = valuation n >= precision n
 type LiftedRadix p = p ^ (Lg p (2 ^ 64) - 1)
 
 -- | A wrapper for a fifted digit.
-newtype Lifted p = Lifted { getLifted :: Mod (LiftedRadix p)}  
 
-deriving via Mod (LiftedRadix p) instance Radix p => Show (Lifted p)
+newtype Lifted p = Lifted { getLifted :: Mod (LiftedRadix p) }
+
+deriving via Mod (LiftedRadix p) instance
+         Radix p => Show (Lifted p)
 
 deriving via Mod (LiftedRadix p) instance Radix p => Eq (Lifted p)
 
@@ -238,11 +239,9 @@ instance Radix p => Integral (Lifted p) where
   quotRem = undefined
 
 ------------------------------------------------------------
--- | Alias for an infinite list of lifted digits
---type LiftedDigits' p = [Lifted p]
-
--- |  Integer p-adic number with 20 digits precision
-newtype Z p = Z [Lifted p]
+-- |  Integer p-adic number (an element of \(\mathbb{Z}_p\)) with 20 digits precision
+newtype Z p =
+  Z [Lifted p]
 
 deriving via (Z' p 20) instance Radix p => Eq (Z p)
 
@@ -251,6 +250,7 @@ deriving via (Z' p 20) instance Radix p => Ord (Z p)
 deriving via (Z' p 20) instance Radix p => Show (Z p)
 
 deriving via (Z' p 20) instance Radix p => Real (Z p)
+
 deriving via (Z' p 20) instance Radix p => Enum (Z p)
 
 deriving via (Z' p 20) instance Radix p => Integral (Z p)
@@ -265,13 +265,13 @@ instance Radix p => Digital (Z p) where
 
 liftDigits :: Radix p => Digits (Z p) -> LiftedDigits (Z p)
 liftDigits ds = res
-   where
-     res = unfoldr go ds
-     go xs =
-       let (a, r) = splitAt (ilog p pk) xs
-        in Just (fromIntegral $ fromRadix p (unMod <$> a), r)
-     p = radix (head ds)
-     pk = radix (head res)
+  where
+    res = unfoldr go ds
+    go xs =
+      let (a, r) = splitAt (ilog p pk) xs
+       in Just (fromIntegral $ fromRadix p (unMod <$> a), r)
+    p = radix (head ds)
+    pk = radix (head res)
 
 unliftDigits :: Radix p => LiftedDigits (Z p) -> Digits (Z p)
 unliftDigits ds = res
@@ -355,10 +355,9 @@ divZ a (b:bs) = go a <$ invert b
 
 invert :: Radix p => Lifted p -> Maybe (Lifted p)
 invert (Lifted m) = Lifted <$> invertMod m
-  
 
 ------------------------------------------------------------
--- |  Integer p-adic number with explicitly specified precision
+-- |  Integer p-adic number (an element of \(\mathbb{Z}_p\)) with explicitly specified precision
 newtype Z' (p :: Nat) (prec :: Nat) =
   Z' (Z p)
 
@@ -413,7 +412,6 @@ instance (KnownNat prec, Radix p) => Enum (Z' p prec) where
   toEnum = fromIntegral
   fromEnum = fromIntegral . toInteger
 
-
 instance (KnownNat prec, Radix p) => Integral (Z' p prec) where
   toInteger n =
     case findCycle prec ds of
@@ -430,8 +428,8 @@ instance (KnownNat prec, Radix p) => Integral (Z' p prec) where
       Just r -> Z' r
       Nothing ->
         error $ show d ++ " is indivisible in " ++ show (radix d) ++ "-adics!"
-  quot = div
-  quotRem = error "modular arithmetic is not defined for p-adics!"
+  mod a m = fromInteger (toInteger a `mod` toInteger m)
+  quotRem a b = (a `div` b, a `mod` b)
 
 findCycle :: Eq a => Int -> [a] -> ([a], [a])
 findCycle len lst =
@@ -468,28 +466,29 @@ instance (KnownNat prec, Radix p) => Real (Z' p prec) where
       prec = precision x
       p = radix x
       pk = radix (head ds)
-      m = p ^ (2*prec)
+      m = p ^ (2 * prec)
       n = fromRadix pk (take (ilog pk m + 1) (unMod . getLifted <$> ds))
-  
+
 ratDecomposition :: Integer -> Integer -> Rational
-ratDecomposition n m = go (m,0) (n,1)
+ratDecomposition n m = go (m, 0) (n, 1)
   where
     go (v1, v2) (w1, w2)
-      | w1 > isqrt m = let q = v1 `div` w1
-                       in go (w1, w2) (v1 - q*w1, v2 - q*w2)
+      | w1 > isqrt m =
+        let q = v1 `div` w1
+         in go (w1, w2) (v1 - q * w1, v2 - q * w2)
       | otherwise = w1 % w2
 
 isqrt :: (Integral b, Integral a) => a -> b
 isqrt n = floor (sqrt (fromIntegral n))
-  
+
 ------------------------------------------------------------
 ------------------------------------------------------------
--- |  Rational p-adic number with 20 digits precision.
+-- |  Rational p-adic number (an element of \(\mathbb{Q}_p\)) with 20 digits precision.
 data Q (p :: Nat)
   = Zero
   | Q Int (Z p)
 
--- |  Rational p-adic number with explicitly given precision.
+-- |  Rational p-adic number (an element of \(\mathbb{Q}_p\)) with explicitly given precision.
 newtype Q' (p :: Nat) (prec :: Nat) =
   Q' (Q p)
 
@@ -534,7 +533,7 @@ instance (KnownNat prec, Radix p) => Show (Q' p prec) where
       sep
         | radix n < 11 = ""
         | otherwise = " "
-  
+
 instance Radix p => Digital (Q p) where
   type Digits (Q p) = Digits (Z p)
   radix = fromIntegral . natVal
@@ -647,8 +646,8 @@ instance (KnownNat prec, Radix p) => Real (Q' p prec) where
   toRational (Q' Zero) = 0
   toRational n = toRational (unit n) / norm n
 
--- | Test for divisibility.
-isDivisible n = unMod d `gcd` radix d == 1
+-- | Returms 'True' for multiplicatively invertible numbers.
+isInvertible n = unMod d `gcd` radix d == 1
   where
     d = firstDigit n
 
