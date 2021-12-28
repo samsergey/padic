@@ -39,6 +39,9 @@ library
     , inflist
     , integer-gmp
     , mod
+    , tasty
+    , tasty-hunit
+    , tasty-quickcheck
   default-language: Haskell2010
 
 test-suite padic-test
@@ -60,6 +63,9 @@ test-suite padic-test
     , integer-gmp
     , mod
     , padic
+    , tasty
+    , tasty-hunit
+    , tasty-quickcheck
   default-language: Haskell2010
 
 benchmark criterion-benchmarks
@@ -81,4 +87,7 @@ benchmark criterion-benchmarks
     , integer-gmp
     , mod
     , padic
+    , tasty
+    , tasty-hunit
+    , tasty-quickcheck
   default-language: Haskell2010

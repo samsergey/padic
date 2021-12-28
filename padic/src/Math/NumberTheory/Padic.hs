@@ -20,7 +20,7 @@
 --
 -- Module introduces p-adic integers \(\mathbb{Z}_p\) and p-adic rational numbers \(\mathbb{Q}_p\)
 -- of arbitratry precision, implementing basic arithmetic as well as some specific functions,
--- i.e. detection of periodicity in digital sequence, rational reconstruction, square roots etc.
+-- i.e. detection of periodicity in sequence of digits, rational reconstruction, computation of square roots etc.
 --
 -- The radix \(p\) of a p-adic number is specified at a type level via type-literals. In order to use them GHCi should be loaded with '-XDataKinds' extension.
 --
@@ -86,6 +86,7 @@ module Math.NumberTheory.Padic
   , divMaybe
   , fromRadix
   , toRadix
+  , findCycle
   ) where
 
 import Data.Constraint (Constraint)
@@ -214,7 +215,7 @@ isZero n = valuation n >= precision n
 -- \]
 --
 -- Sequence of digits modulo \(p\) are used mainly for textual representation and may be obtained by 'digits' function.
-type LiftedRadix p = p ^ (Lg p (2 ^ 64) - 1)
+type LiftedRadix p = p ^ (Lg p (2 ^ 32) - 1)
 
 -- | A wrapper for a fifted digit.
 
@@ -316,6 +317,7 @@ fromRadix :: (Integral i, Integral d) => i -> [d] -> i
 fromRadix b = foldr (\x r -> fromIntegral x + r * b) 0
 
 negZ :: Radix p => [Lifted p] -> [Lifted p]
+{-# INLINE negZ #-}
 negZ = go
   where
     go (0:t) = 0 : go t
@@ -437,19 +439,21 @@ instance (KnownNat prec, Radix p) => Integral (Z' p prec) where
   mod a m = fromInteger (toInteger a `mod` toInteger m)
   quotRem a b = (a `div` b, a `mod` b)
 
+-- | For a given list extracts prefix and a cycle, limiting length of prefix and cycle by `len`.
+-- Uses the modified tortiose and hare method.
 findCycle :: Eq a => Int -> [a] -> ([a], [a])
 findCycle len lst =
-  case turlteHare rest of
+  case tortoiseHare rest of
     Just (a, c) -> clean $ rollback (pref ++ a, c)
     Nothing -> (pref, [])
   where
     (pref, rest) = splitAt len lst
-    turlteHare x =
+    tortoiseHare x =
       fmap (fmap fst) . listToMaybe $
-      dropWhile (\(_, (a, b)) -> isCycle a b) $
+      dropWhile (\(_, (a, b)) -> notCycle a b) $
       zip (inits x) $
       zipWith splitAt [1 .. len] $ zipWith take [4,8 ..] $ tails x
-    isCycle a b = concat (replicate 3 a) /= b
+    notCycle a b = not (concat (replicate 3 a) == b)
     rollback (as, bs) = go (reverse as, reverse bs)
       where
         go =
@@ -479,13 +483,11 @@ ratDecomposition :: Integer -> Integer -> Rational
 ratDecomposition n m = go (m, 0) (n, 1)
   where
     go (v1, v2) (w1, w2)
-      | w1 > isqrt m =
+      | w1*w1 > m =
         let q = v1 `div` w1
          in go (w1, w2) (v1 - q * w1, v2 - q * w2)
       | otherwise = w1 % w2
 
-isqrt :: (Integral b, Integral a) => a -> b
-isqrt n = floor (sqrt (fromIntegral n))
 
 ------------------------------------------------------------
 ------------------------------------------------------------

@@ -10,7 +10,7 @@ import Data.List
 import Data.Maybe
 import Data.Ratio
 import Data.Mod
-import PMath.NumberTheory.Padic
+import Math.NumberTheory.Padic
 import Test.Hspec
 import Test.QuickCheck
 
