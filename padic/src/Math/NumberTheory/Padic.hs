@@ -205,8 +205,7 @@ isZero :: Padic n => n -> Bool
 isZero n = valuation n >= precision n
 
 ------------------------------------------------------------
--- |
--- In order to gain efficiency the p-adic number is internally
+-- | In order to gain efficiency the p-adic number is internally
 -- represented as an infinite list of /lifted/ digits modulo \(p^k\), where \(k\) is
 -- chosen so that each lifted digit fits in a 'Word'.
 --
@@ -215,7 +214,7 @@ isZero n = valuation n >= precision n
 -- \]
 --
 -- Sequence of digits modulo \(p\) are used mainly for textual representation and may be obtained by 'digits' function.
-type LiftedRadix p = p ^ (Lg p (2 ^ 32) - 1)
+type LiftedRadix p = p ^ (Lg p (2 ^ 64 - 1))
 
 -- | A wrapper for a fifted digit.
 
