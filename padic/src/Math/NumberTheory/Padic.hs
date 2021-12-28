@@ -10,7 +10,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 
 -- |
--- Module      : Padic
+-- Module      : Math.NumberTheory.Padic
 -- Description : Representation a nd simple algebra for p-adic numbers.
 -- Copyright   : (c) Sergey Samoylenko, 2021
 -- License     : GPL-3
@@ -48,9 +48,10 @@
 ------------------------------------------------------------
 
 module Math.NumberTheory.Padic
+  ( 
   -- * Classes and functions
   -- ** Type synonyms and constraints
-  ( ValidRadix
+    ValidRadix
   , LiftedRadix
   , Lifted
   , LiftedDigits
@@ -66,6 +67,7 @@ module Math.NumberTheory.Padic
   , Unit
   , precision
   , splitUnit
+  , normalize
   , unit
   , valuation
   , norm
@@ -77,7 +79,7 @@ module Math.NumberTheory.Padic
    -- ** p-Adic rationals
   , Q
   , Q'
-  -- * Functions and utilities.
+  -- * Functions and utilities
   , getUnit
   , firstDigit
   , isInvertible
@@ -299,6 +301,7 @@ instance Radix p => Num (Z p) where
   Z a * Z b = Z $ mulZ a b
   negate (Z a) = Z $ negZ a
 
+-- | Unfords a number to a list of digits.  
 toRadix :: (Integral i, Integral d) => i -> i -> [d]
 toRadix _ 0 = [0]
 toRadix b n = unfoldr go n
@@ -307,7 +310,8 @@ toRadix b n = unfoldr go n
     go x =
       let (q, r) = quotRem x b
        in Just (fromIntegral r, q)
-
+  
+-- | Folds a list of digits to a number.
 fromRadix :: (Integral i, Integral d) => i -> [d] -> i
 fromRadix b = foldr (\x r -> fromIntegral x + r * b) 0
 
@@ -636,11 +640,11 @@ instance Radix p => Fractional (Q p) where
           Just r -> r
 
 -- | Extracts p-adic unit from a rational number. For radix \(p\) and rational number \(x\) returns
--- pair \((k, r/s)\) such that \(x = \frac{r}{s} \cdot p^k\).
+-- pair \((k, r/s)\) such that \(x = r/s \cdot p^k\).
 --
 -- >>> getUnit 3 (75/157)
 -- (1,25 % 157)
--- > getUnit 5 (75/157)
+-- >>> getUnit 5 (75/157)
 -- (2,3 % 157)
 -- >>> getUnit 157 (75/157)
 -- (-1,75 % 1)
