@@ -46,7 +46,8 @@
 -- The power \(k\) depends on the specifiied precision of a p-adic number and affects the upper bounds of numerator and denominator of the reconstructed rational.
 --
 ------------------------------------------------------------
-module Padic
+
+module Math.NumberTheory.Padic
   -- * Classes and functions
   -- ** Type synonyms and constraints
   ( ValidRadix
@@ -77,6 +78,7 @@ module Padic
   , Q
   , Q'
   -- * Functions and utilities.
+  , getUnit
   , firstDigit
   , isInvertible
   , divMaybe
@@ -633,8 +635,16 @@ instance Radix p => Fractional (Q p) where
             show b ++ " is indivisible in " ++ show (radix a) ++ "-adics!"
           Just r -> r
 
--- extracts p-adic unit from a rational number
-getUnit :: Integral i => i -> Ratio i -> (Int, Ratio i)
+-- | Extracts p-adic unit from a rational number. For radix \(p\) and rational number \(x\) returns
+-- pair \((k, r/s)\) such that \(x = \frac{r}{s} \cdot p^k\).
+--
+-- >>> getUnit 3 (75/157)
+-- (1,25 % 157)
+-- > getUnit 5 (75/157)
+-- (2,3 % 157)
+-- >>> getUnit 157 (75/157)
+-- (-1,75 % 1)
+getUnit :: Integral p => p -> Ratio p -> (Int, Ratio p)
 getUnit p x = (genericLength v2 - genericLength v1, c)
   where
     (v1, b:_) =

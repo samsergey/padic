@@ -3,7 +3,7 @@
 {-# language FlexibleContexts #-}
 
 import Criterion.Main
-import Padic
+import PMath.NumberTheory.Padic
 import qualified PadicLst as L
 import Data.Maybe
 

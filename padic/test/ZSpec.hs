@@ -9,7 +9,7 @@ import qualified Data.InfList as Inf
 import Data.List
 import Data.Maybe
 import Data.Mod
-import Padic
+import Math.NumberTheory.Padic
 import Test.Hspec
 import Test.QuickCheck
 

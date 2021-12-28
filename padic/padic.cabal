@@ -12,7 +12,8 @@ bug-reports:    https://github.com/githubuser/padic/issues
 author:         Author name here
 maintainer:     example@example.com
 copyright:      2021 Author name here
-license:        BSD3
+license:        MIT
+category:       Math, Number Theory
 license-file:   LICENSE
 build-type:     Simple
 extra-source-files:
@@ -21,15 +22,15 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: https://github.com/githubuser/padic
+  location: hhttps://github.com/samsergey/padic
 
 library
   exposed-modules:
-      Padic
+      Math.NumberTheory.Padic
   other-modules:
       Paths_padic
-  hs-source-dirs:
-      src
+--  hs-source-dirs:
+--      Math/NumberTheory/Padic
   build-depends:
       QuickCheck
     , base
