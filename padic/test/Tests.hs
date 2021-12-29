@@ -178,6 +178,9 @@ ratHomoTests = testGroup "Conversion to and from rationals"
   ]
 
 ------------------------------------------------------------
+homo phi psi op t a b = let [x, y, _] = [phi a, phi b, t]
+                        in 
+
 addHomo :: (Eq a, Num a) => a -> Integer -> Integer -> Bool
 addHomo t a b =
   let [x, y, _] = [fromInteger a, fromInteger b, t]
