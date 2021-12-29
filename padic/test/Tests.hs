@@ -1,11 +1,15 @@
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Tests where
 
 import Math.NumberTheory.Padic
+import GHC.TypeLits hiding (Mod)
+import GHC.Prim (coerce)
 import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
@@ -13,39 +17,51 @@ import Test.QuickCheck
 import Data.Mod
 import Data.Maybe
 import Data.Ratio
+import Data.Word
 
 instance Radix m => Arbitrary (Mod m) where
   arbitrary = fromInteger <$> arbitrary
 
-integerZ :: Radix p => Gen (Z p)
-integerZ = fromInteger <$> arbitrary
-
-arbitraryZ :: Radix p => Gen (Z p)
-arbitraryZ = fromDigits <$> infiniteList
-
-rationalZ :: Radix p => Gen (Z p)
-rationalZ = do
-  a <- integerZ
-  b <- suchThat integerZ (isJust . divMaybe a)
-  return $ a `div` b
 
 instance Radix m => Arbitrary (Z m) where
   arbitrary = oneof [integerZ, rationalZ, arbitraryZ]
+    where
+      integerZ = fromInteger <$> arbitrary
+      arbitraryZ = fromDigits <$> infiniteList
+      rationalZ = do
+        a <- integerZ
+        b <- suchThat integerZ isInvertible
+        return $ a `div` b
 
-integerQ :: Radix p => Gen (Q p)
-integerQ = fromInteger <$> arbitrary
-
-rationalQ :: Radix p => Gen (Q p)
-rationalQ = do
-  a <- integerQ
-  b <- integerQ `suchThat` isInvertible
-  return $ a / b
-
-arbitraryQ :: Radix p => Gen (Q p)
-arbitraryQ = fromDigits <$> infiniteList
+instance (KnownNat prec, Radix m) => Arbitrary (Z' m prec) where
+  arbitrary = oneof [integerZ, rationalZ, arbitraryZ]
+    where
+      integerZ = fromInteger <$> arbitrary
+      arbitraryZ = fromDigits <$> infiniteList
+      rationalZ = do
+        a <- integerZ
+        b <- suchThat integerZ isInvertible
+        return $ a `div` b
 
 instance Radix m => Arbitrary (Q m) where
   arbitrary = oneof [integerQ, rationalQ, arbitraryQ]
+    where
+      integerQ = fromInteger <$> arbitrary
+      arbitraryQ = fromDigits <$> infiniteList
+      rationalQ = do
+        a <- integerQ
+        b <- suchThat integerQ isInvertible
+        return $ a / b
+
+instance (KnownNat prec, Radix m) => Arbitrary (Q' m prec) where
+  arbitrary = oneof [integerQ, rationalQ, arbitraryQ]
+    where
+      integerQ = fromInteger <$> arbitrary
+      arbitraryQ = fromDigits <$> infiniteList
+      rationalQ = do
+        a <- integerQ
+        b <- suchThat integerQ isInvertible
+        return $ a / b
 
 a @/= b = assertBool "" (a /= b)
 
@@ -110,6 +126,8 @@ showTestZ = testGroup "Z"
   , testCase "-123" $ show (-123 :: Z 10) @?= "(9)877"
   , testCase "1/23" $ show (1 `div` 23 :: Z 10) @?= "…65217391304347826087"
   , testCase "1/23" $ show (1 `div` 23 :: Z' 10 40) @?= "(6956521739130434782608)7"
+  , testCase "123456" $ show (123456 :: Z 257) @?= "1 223 96"
+  , testCase "123456" $ show (-123456 :: Z 257) @?= "(256) 255 33 161"
   ]
 
 showTestQ = testGroup "Q"
@@ -121,11 +139,49 @@ showTestQ = testGroup "Q"
   , testCase "-123" $ show (-123 :: Q 10) @?= "(9)877.0"
   , testCase "1/2" $ show (1/2 :: Q 2) @?= "0.1"
   , testCase "-1/2" $ show (-1/2 :: Q 2) @?= "(1).1"
+  , testCase "1/15" $ show (1/15 :: Q 3) @?= "(1210).2"
+  , testCase "1/15" $ show (1/15 :: Q' 3 60) @?= "(1210).2"
   , testCase "1/700" $ show (1/700 :: Q 10) @?= "(428571).43"
   , testCase "100/7" $ show (100/7 :: Q 10) @?= "(285714)300.0"
   , testCase "1/23" $ show (1/23 :: Q 10) @?= "…65217391304347826087.0"
   , testCase "1/23" $ show (1/23 :: Q' 10 40) @?= "(6956521739130434782608)7.0"
+  , testCase "123456" $ show (123456 :: Q 257) @?= "1 223 96 . 0"
+  , testCase "123456" $ show (-123456 :: Q 257) @?= "(256) 255 33 161 . 0"
   ]
+
+------------------------------------------------------------
+
+intHomo :: (Integral n, Num n) => n -> Integer -> Bool
+intHomo t a =
+  let [x, _] = [fromInteger a, t]
+   in toInteger x == a
+
+intHomoTests = testGroup "Conversion to and from integers"
+  [ testProperty "Z 2" $ intHomo (0 :: Z 2)
+  , testProperty "Z' 2 60" $ intHomo (0 :: Z' 2 60)
+  , testProperty "Z 3" $ intHomo (0 :: Z 3)
+  , testProperty "Z' 3 60" $ intHomo (0 :: Z' 3 60)
+  , testProperty "Z 10" $ intHomo (0 :: Z 10)
+  , testProperty "Z' 10 60" $ intHomo (0 :: Z' 10 60)
+  ]
+
+ratHomo :: (Real a, Fractional a) => a -> Ratio Int -> Bool
+ratHomo t r = let [_, x] = [t, fromRational (toRational r)]
+              in toRational x == toRational r
+
+ratHomoTests = testGroup "Conversion to and from rationals"
+  [ testProperty "Q 2" $ ratHomo (0 :: Q' 2 63)
+  , testProperty "Q 3" $ ratHomo (0 :: Q' 3 39)
+  , testProperty "Q 5" $ ratHomo (0 :: Q' 5 27)
+  , testProperty "Q 11" $ ratHomo (0 :: Q 11)
+  , testProperty "Q 257" $ ratHomo (0 :: Q 257)
+  ]
+
+------------------------------------------------------------
+addHomo :: (Eq a, Num a) => a -> Integer -> Integer -> Bool
+addHomo t a b =
+  let [x, y, _] = [fromInteger a, fromInteger b, t]
+   in x + y == fromInteger (a + b)
 
 ------------------------------------------------------------
 testSuite :: TestTree
@@ -135,6 +191,8 @@ testSuite = testGroup "test"
   , showTests
   , digitTests 
   , equivTest
+  , intHomoTests
+  , ratHomoTests
   ]
 
 main = defaultMain testSuite 

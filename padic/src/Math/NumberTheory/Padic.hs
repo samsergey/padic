@@ -87,6 +87,7 @@ module Math.NumberTheory.Padic
   , fromRadix
   , toRadix
   , findCycle
+  , sufficientPrecision
   ) where
 
 import Data.Constraint (Constraint)
@@ -478,15 +479,27 @@ instance (KnownNat prec, Radix p) => Real (Z' p prec) where
       m = p ^ (2 * prec)
       n = fromRadix pk (take (ilog pk m + 1) (unMod . getLifted <$> ds))
 
+
 ratDecomposition :: Integer -> Integer -> Rational
 ratDecomposition n m = go (m, 0) (n, 1)
   where
     go (v1, v2) (w1, w2)
-      | w1*w1 > m =
+      | w1*w1 > abs m =
         let q = v1 `div` w1
          in go (w1, w2) (v1 - q * w1, v2 - q * w2)
       | otherwise = w1 % w2
 
+-- | For given radix /p/ and natural number /m/ returns precision sufficient for rational
+-- reconstruction of fractions with numerator and denominator not exceeding /m/.
+--
+-- >>> sufficientPrecision 2 (maxBound :: Int)
+-- 63
+-- >>> sufficientPrecision 3 (maxBound :: Int)
+-- 39
+-- >>> sufficientPrecision 11 (maxBound :: Int)
+-- 18
+sufficientPrecision :: (Integral a) => Integer -> a -> Integer
+sufficientPrecision p m = ilog p (fromIntegral m)
 
 ------------------------------------------------------------
 ------------------------------------------------------------
