@@ -14,6 +14,7 @@ import GHC.Prim (coerce)
 import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
+import Test.Tasty.ExpectedFailure
 import Test.QuickCheck
 import Data.Mod
 import Data.Maybe
@@ -80,6 +81,11 @@ digitTests = testGroup "Conversion to and from digits"
   , testProperty "Q 2" $ digitsTestQ @2
   , testProperty "Q 10" $ digitsTestQ @10
   , testProperty "Q 257" $ digitsTestQ @257
+  , testCase "1" $ firstDigit (1 :: Q 3) @?= 1
+  , testCase "-1" $ firstDigit (-1 :: Q 3) @?= 2
+  , testCase "2" $ firstDigit (0 :: Q 3) @?= 0
+  , testCase "3" $ firstDigit (9 :: Q 3) @?= 0
+  , testCase "4" $ firstDigit (9 :: Q 10) @?= 9
   ]
   
 ------------------------------------------------------------
@@ -148,20 +154,6 @@ showTestQ = testGroup "Q"
   , testCase "1/23" $ show (1/23 :: Q' 10 40) @?= "(6956521739130434782608)7.0"
   , testCase "123456" $ show (123456 :: Q 257) @?= "1 223 96 . 0"
   , testCase "123456" $ show (-123456 :: Q 257) @?= "(256) 255 33 161 . 0"
-  ]
-
-------------------------------------------------------------
-
-ratHomo :: (Real a, Fractional a) => a -> Ratio Int -> Bool
-ratHomo t r = let [_, x] = [t, fromRational (toRational r)]
-              in toRational x == toRational r
-
-ratHomoTests = testGroup "Conversion to and from rationals"
-  [ testProperty "Q 2" $ ratHomo (0 :: Q' 2 63)
-  , testProperty "Q 3" $ ratHomo (0 :: Q' 3 39)
-  , testProperty "Q 5" $ ratHomo (0 :: Q' 5 27)
-  , testProperty "Q 11" $ ratHomo (0 :: Q 11)
-  , testProperty "Q 257" $ ratHomo (0 :: Q 257)
   ]
 
 ------------------------------------------------------------
@@ -254,8 +246,37 @@ ringIsoQTests = testGroup "Ring isomorphism"
   [ ringIsoQ "Q' 2 33" (0 :: Q' 2 33)
   , ringIsoQ "Q' 3 21" (0 :: Q' 3 21)
   , ringIsoQ "Q' 257 5" (0 :: Q' 257 5)
-  , ringIsoQ "Q 258" (0 :: Q 258)
+  , expectFailBecause "Radix is to big." $
+    ringIsoQ "Q 258" (0 :: Q 258)
   ]
+
+------------------------------------------------------------
+newtype AnyRadix = AnyRadix Int
+  deriving (Show, Eq, Num)
+  
+instance Arbitrary AnyRadix where
+  arbitrary = AnyRadix <$> arbitrary `suchThat` (> 1)
+  
+pAdicUnitTests :: TestTree
+pAdicUnitTests = testGroup "p-adic units."
+  [ testCase "2" $ getUnit 2 (4%7) @?= (1 % 7, 2)
+  , testCase "7" $ getUnit 7 (4%7) @?= (4 % 1, -1)
+  , testProperty "0" $ \(AnyRadix p) -> getUnit @Int p 0 === (0, 0)
+  , testProperty "1" $ \(AnyRadix p) -> getUnit @Int p 1 === (1, 0)
+  , testProperty "p" $
+      \(AnyRadix p) r -> let (u, k) = getUnit @Int p r
+                         in r === fromIntegral p^^k * u
+  , testCase "8" $ splitUnit (0 :: Q 2) @?= (0, 20)
+  , testCase "9" $ splitUnit (1 :: Q 2) @?= (1, 0)
+  , testCase "10" $ splitUnit (100 :: Q 2) @?= (25, 2)
+  , testCase "11" $ splitUnit (1/96 :: Q 2) @?= (1 `div` 3, -5)
+  , testCase "12" $ splitUnit (-1/96 :: Q 2) @?= (-1 `div` 3, -5)
+  ]
+
+------------------------------------------------------------
+
+toRadixTests = testGroup "Conversion to and from digits" $
+  [ testProperty ""
 
 ------------------------------------------------------------
 testSuite :: TestTree
@@ -265,7 +286,8 @@ testSuite = testGroup "test"
   , showTests
   , digitTests 
   , equivTest
-  , ratHomoTests
+  , ringIsoZTests
+  , ringIsoQTests
   ]
 
 main = defaultMain testSuite 

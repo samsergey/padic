@@ -218,7 +218,6 @@ isZero n = valuation n >= precision n
 type LiftedRadix p = p ^ (Lg p (2 ^ 64 - 1))
 
 -- | A wrapper for a fifted digit.
-
 newtype Lifted p = Lifted { getLifted :: Mod (LiftedRadix p) }
 
 deriving via Mod (LiftedRadix p) instance
@@ -639,7 +638,7 @@ instance Radix p => Fractional (Q p) where
     where
       res = Q v (fromDigits (series n))
       p = radix res
-      (v, q) = getUnit p x
+      (q, v) = getUnit p x
       (n, d) = (fromIntegral $ numerator q, fromIntegral $ denominator q)
       series 0 = repeat 0
       series n =
@@ -663,8 +662,9 @@ instance Radix p => Fractional (Q p) where
 -- (2,3 % 157)
 -- >>> getUnit 157 (75/157)
 -- (-1,75 % 1)
-getUnit :: Integral p => p -> Ratio p -> (Int, Ratio p)
-getUnit p x = (genericLength v2 - genericLength v1, c)
+getUnit :: Integral p => p -> Ratio p -> (Ratio p, Int)
+getUnit _ 0 = (0, 0)
+getUnit p x = (c, genericLength v2 - genericLength v1)
   where
     (v1, b:_) =
       span (\n -> denominator n `mod` p == 0) $ iterate (* fromIntegral p) x
