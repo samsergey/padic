@@ -2,10 +2,11 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module Tests where
+module Main where
 
 import Math.NumberTheory.Padic
 import GHC.TypeLits hiding (Mod)
@@ -151,20 +152,6 @@ showTestQ = testGroup "Q"
 
 ------------------------------------------------------------
 
-intHomo :: (Integral n, Num n) => n -> Integer -> Bool
-intHomo t a =
-  let [x, _] = [fromInteger a, t]
-   in toInteger x == a
-
-intHomoTests = testGroup "Conversion to and from integers"
-  [ testProperty "Z 2" $ intHomo (0 :: Z 2)
-  , testProperty "Z' 2 60" $ intHomo (0 :: Z' 2 60)
-  , testProperty "Z 3" $ intHomo (0 :: Z 3)
-  , testProperty "Z' 3 60" $ intHomo (0 :: Z' 3 60)
-  , testProperty "Z 10" $ intHomo (0 :: Z 10)
-  , testProperty "Z' 10 60" $ intHomo (0 :: Z' 10 60)
-  ]
-
 ratHomo :: (Real a, Fractional a) => a -> Ratio Int -> Bool
 ratHomo t r = let [_, x] = [t, fromRational (toRational r)]
               in toRational x == toRational r
@@ -178,13 +165,97 @@ ratHomoTests = testGroup "Conversion to and from rationals"
   ]
 
 ------------------------------------------------------------
-homo phi psi op t a b = let [x, y, _] = [phi a, phi b, t]
-                        in 
 
-addHomo :: (Eq a, Num a) => a -> Integer -> Integer -> Bool
-addHomo t a b =
-  let [x, y, _] = [fromInteger a, fromInteger b, t]
-   in x + y == fromInteger (a + b)
+homo0 :: Eq a => (a -> t) -> (t -> a) -> t -> a -> Bool
+homo0 phi psi w a =
+  let [x, _] = [phi a, w] in psi x == a
+
+homo1 :: Eq t => (a -> t)
+      -> (a -> a -> a)
+      -> (t -> t -> t)
+      -> t -> a -> a -> Bool
+homo1 phi opa opt w a b =
+  let [x, y, _] = [phi a, phi b, w]
+  in x `opt` y == phi (a `opa` b)
+
+homo2 :: Eq a => (a -> t) -> (t -> a)
+      -> (a -> a -> a)
+      -> (t -> t -> t)
+      -> t -> a -> a -> Bool
+homo2 phi psi opa opt w a b =
+  let [x, y, _] = [phi a, phi b, w]
+  in psi (x `opt` y) == a `opa` b
+
+invOp :: Eq t => (a -> t) 
+      -> (t -> t -> t) 
+      -> (t -> t)
+      -> (t -> Bool)
+      -> t -> a -> a -> Property
+invOp phi op inv p w a b =
+  let [x, y, _] = [phi a, phi b, w]
+  in p y ==> (x `op` y) `op` inv y == x 
+  
+
+ringIsoZ
+  :: (ValidRadix m, Integral n, Digital n, KnownNat m,
+      Digits n ~ [Mod m]) =>
+     TestName -> n -> TestTree
+ringIsoZ s t = testGroup s 
+  [ testProperty "Z <-> Zp" $ homo0 fromInteger toInteger t
+  , testProperty "add Z -> Zp" $ homo1 fromInteger (+) (+) t
+  , testProperty "add Zp -> Z" $ homo2 fromInteger toInteger (+) (+) t
+  , testProperty "mul Z -> Zp" $ homo1 fromInteger (*) (*) t
+  , testProperty "mul Zp -> Z" $ homo2 fromInteger toInteger (*) (*) t
+  , testProperty "negation Zp" $ invOp fromInteger (+) negate (const True) t
+  , testProperty "inversion Zp" $ invOp fromInteger (*) (div 1) isInvertible t
+  ]
+
+ringIsoZTests = testGroup "Ring isomorphism"
+  [ ringIsoZ "Z 2" (0 :: Z 2)
+  , ringIsoZ "Z' 2 60" (0 :: Z' 2 60)
+  , ringIsoZ "Z 3" (0 :: Z 3)
+  , ringIsoZ "Z' 3 60" (0 :: Z' 3 60)
+  , ringIsoZ "Z 10" (0 :: Z 10)
+  , ringIsoZ "Z' 10 60" (0 :: Z' 10 60)
+  , ringIsoZ "Z 65535" (0 :: Z 65535)
+  , ringIsoZ "Z' 65535 60" (0 :: Z' 65535 60)
+  ]
+
+newtype SmallRational = SmallRational (Rational)
+  deriving (Show, Eq, Num, Fractional)
+
+instance Arbitrary SmallRational where
+  arbitrary = do
+    n <- chooseInteger (-65535,65535)
+    d <- chooseInteger (1,65535)
+    return $ SmallRational (n % d)
+  shrink (SmallRational r) = SmallRational <$> shrink r
+  
+ringIsoQ
+  :: (ValidRadix m, Fractional n, Real n, Digital n, KnownNat m,
+      Digits n ~ [Mod m]) =>
+     TestName -> n -> TestTree
+ringIsoQ s t = testGroup s 
+  [ testProperty "Q <-> Qp" $ homo0 phi psi t
+  , testProperty "add Q -> Qp" $ homo1 phi (+) (+) t
+  , testProperty "add Qp -> Q" $ homo2 phi psi (+) (+) t
+  , testProperty "mul Q -> Qp" $ homo1 phi (*) (*) t
+  , testProperty "mul Qp -> Q" $ homo2 phi psi (*) (*) t
+  , testProperty "negation Qp" $ invOp phi (+) negate (const True) t
+  , testProperty "inversion Qp" $ invOp phi (*) (1 /) isInvertible t
+  ]
+  where
+    phi :: (Fractional n, Real n) => SmallRational -> n
+    phi (SmallRational r) = fromRational r
+    psi :: (Fractional n, Real n) => n -> SmallRational
+    psi = SmallRational . toRational 
+
+ringIsoQTests = testGroup "Ring isomorphism"
+  [ ringIsoQ "Q' 2 33" (0 :: Q' 2 33)
+  , ringIsoQ "Q' 3 21" (0 :: Q' 3 21)
+  , ringIsoQ "Q' 257 5" (0 :: Q' 257 5)
+  , ringIsoQ "Q 258" (0 :: Q 258)
+  ]
 
 ------------------------------------------------------------
 testSuite :: TestTree
@@ -194,7 +265,6 @@ testSuite = testGroup "test"
   , showTests
   , digitTests 
   , equivTest
-  , intHomoTests
   , ratHomoTests
   ]
 
