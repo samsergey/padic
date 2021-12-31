@@ -26,6 +26,7 @@ source-repository head
 library
   exposed-modules:
       Math.NumberTheory.Padic
+      Math.NumberTheory.PadicStable
   other-modules:
       Paths_padic
   hs-source-dirs:
@@ -35,22 +36,20 @@ library
     , base
     , constraints
     , ghc-prim
-    , hspec
     , inflist
     , integer-gmp
     , mod
     , tasty
+    , tasty-expected-failure
     , tasty-hunit
     , tasty-quickcheck
-    , tasty-expected-failure
   default-language: Haskell2010
 
 test-suite padic-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
-      ZSpec
-      QSpec
+      Paths_padic
   hs-source-dirs:
       test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
@@ -59,15 +58,14 @@ test-suite padic-test
     , base
     , constraints
     , ghc-prim
-    , hspec
     , inflist
     , integer-gmp
     , mod
     , padic
     , tasty
+    , tasty-expected-failure
     , tasty-hunit
     , tasty-quickcheck
-    , tasty-expected-failure
   default-language: Haskell2010
 
 benchmark criterion-benchmarks
@@ -84,13 +82,12 @@ benchmark criterion-benchmarks
     , constraints
     , criterion
     , ghc-prim
-    , hspec
     , inflist
     , integer-gmp
     , mod
     , padic
     , tasty
+    , tasty-expected-failure
     , tasty-hunit
     , tasty-quickcheck
-    , tasty-expected-failure
   default-language: Haskell2010

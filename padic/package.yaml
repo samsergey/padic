@@ -26,13 +26,12 @@ dependencies:
  - integer-gmp
  - ghc-prim
  - mod
- - hspec
- - QuickCheck
  - tasty
  - tasty-hunit
  - tasty-quickcheck
  - tasty-expected-failure
-
+ - QuickCheck
+ 
 library:
   source-dirs: src
 
@@ -47,11 +46,11 @@ tests:
     dependencies:
     - base
     - padic
-    - hspec
     - QuickCheck
-    other-modules:
-      - ZSpec
-      - QSpec
+    - tasty
+    - tasty-hunit
+    - tasty-quickcheck
+    - tasty-expected-failure
 
 benchmarks:
   criterion-benchmarks:
