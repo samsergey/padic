@@ -26,7 +26,6 @@ source-repository head
 library
   exposed-modules:
       Math.NumberTheory.Padic
-      Math.NumberTheory.PadicStable
   other-modules:
       Paths_padic
   hs-source-dirs:
@@ -49,6 +48,7 @@ test-suite padic-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      SpecStable
       Paths_padic
   hs-source-dirs:
       test

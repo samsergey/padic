@@ -63,10 +63,13 @@ module Math.NumberTheory.Padic
   , radix
   , digits
   , fromDigits
+  -- ** Objects with fixed precision
+  , Fixed
+  , precision
+  , type (%) (..)
   -- ** p-adic numbers
   , Padic
   , Unit
-  , precision
   , splitUnit
   , unit
   , valuation
@@ -75,14 +78,16 @@ module Math.NumberTheory.Padic
     -- * Data types
     -- ** p-Adic integers
   , Z
+  , Q
   -- * Functions and utilities
-  , getUnit
   , firstDigit
   , isInvertible
   , fromRadix
   , toRadix
   , findCycle
   , sufficientPrecision
+  , getUnitQ
+  , getUnitZ
   ) where
 
 import Data.Constraint (Constraint)
@@ -166,6 +171,11 @@ instance (KnownNat prec, Integral a, Fixed a) => Integral (a % prec) where
   quotRem (Prec a) (Prec b) = let (q, r) = quotRem a b
                               in (Prec q, Prec r)
 
+instance (KnownNat prec, Fractional a, Fixed a) => Fractional (a % prec) where
+  fromRational = Prec . fromRational
+  recip (Prec a) = Prec (recip a)
+  Prec a / Prec b = Prec (a / b)
+
 ------------------------------------------------------------
 -- | Typeclass for digitally representable objects
 class Digital n where
@@ -211,6 +221,7 @@ class (Num n, Digital n, Fixed n) => Padic n where
   type Unit n
   -- | A type for a sequence of lifted digits
   type LiftedDigits n
+  fromUnit :: (Unit n, Int) -> n
   -- | Returns valuation and unit of a number.
   splitUnit :: n -> (Unit n, Int)
   -- | Returns lifted digits
@@ -221,6 +232,7 @@ class (Num n, Digital n, Fixed n) => Padic n where
   -- >>> take 3 $ liftedDigits (-123 :: Z 2)
   -- [(9223372036854775685 `modulo` 9223372036854775808),(9223372036854775807 `modulo` 9223372036854775808),(9223372036854775807 `modulo` 9223372036854775808)]
   liftedDigits :: n -> LiftedDigits n
+  mkUnit :: LiftedDigits n -> n
   inverse :: n -> Maybe n
   
 
@@ -260,9 +272,10 @@ isZero n = valuation n >= precision n
 instance (KnownNat prec, Padic a) => Padic (a % prec) where
   type Unit (a % prec) = Unit a % prec
   type LiftedDigits (a % prec) = LiftedDigits a
-  splitUnit (Prec a) = let (u, v) = splitUnit a
-                       in (Prec u, v) 
+  fromUnit (Prec u, v) = Prec $ fromUnit (u, v)
+  splitUnit (Prec a) = (Prec $ unit a, valuation a) 
   liftedDigits (Prec a) = liftedDigits a
+  mkUnit ds = Prec $ mkUnit ds
   inverse (Prec a) = Prec <$> inverse a
 
 ------------------------------------------------------------
@@ -305,9 +318,9 @@ newtype Z p = Z [Lifted p]
 instance Radix p => Fixed (Z p) where
   precision  _ = 20
 
-  showPrec _ 0 = "0"
   showPrec pr n =
     case findCycle pr (digits n) of
+      ([],[0]) -> "0"
       (pref, []) -> "…" ++ toString pref
       (pref, [0]) -> toString pref
       (pref, cyc)
@@ -361,7 +374,7 @@ ilog a b = floor (logBase (fromIntegral a) (fromIntegral b))
 instance Radix p => Num (Z p) where
   fromInteger n
     | n < 0 = -fromInteger (-n)
-    | otherwise = Z $ d : ds
+    | otherwise = Z (d:ds)
     where
       d:ds = toRadix (radix d) n ++ repeat 0
   abs = id
@@ -422,6 +435,7 @@ invert (Lifted m) = Lifted <$> invertMod m
 instance Radix p => Padic (Z p) where
   type Unit (Z p) = Z p
   type LiftedDigits (Z p) = [Lifted p]
+  fromUnit (u, v) = radix u^v * u
   splitUnit n = go prec (digits n)
     where
       prec = precision n
@@ -431,9 +445,10 @@ instance Radix p => Padic (Z p) where
           0:ds -> go (k - 1) ds
           _ -> (fromDigits xs, prec - k)
   liftedDigits (Z ds) = ds
+  mkUnit = Z
   inverse n | isInvertible n = Just (1 `div` n)
             | otherwise = Nothing
-
+  
 instance Radix p => Ord (Z p) where
   compare = error "ordering is not defined for Z"
 
@@ -525,12 +540,11 @@ sufficientPrecision p m = ilog p (2 * fromIntegral m) + 1
 ------------------------------------------------------------
 
 -- |  Rational p-adic number (an element of \(\mathbb{Q}_p\)) with 20 digits precision.
-data Q (p :: Nat) = Q Int (Z p)
+data Q (p :: Nat) = Q (Z p) Int
 
 instance Radix p => Fixed (Q p) where
   precision  _ = 20
 
-  showPrec _ 0 = "0.0"
   showPrec pr n = si ++ sep ++ "." ++ sep ++ sf
     where
       k = valuation n
@@ -573,41 +587,51 @@ instance Radix p => Ord (Q p) where
 instance Radix p => Digital (Q p) where
   type Digits (Q p) = Digits (Z p)
   radix = fromIntegral . natVal
-  digits (Q v u) = replicate v 0 ++ digits u
-  fromDigits ds = Q 0 (fromDigits ds)
+  digits (Q u v) = replicate v 0 ++ digits u
+  fromDigits ds = Q (fromDigits ds) 0
 
 instance Radix p => Padic (Q p) where
   type Unit (Q p) = Z p
   type LiftedDigits (Q p) = [Lifted p]
-  splitUnit (Q v u) = (u, v)
+  fromUnit (u, v) = Q u v
+  splitUnit (Q u v) = (u, v)
   liftedDigits = liftedDigits . unit
+  mkUnit ds = Q (mkUnit ds) 0
+  
   inverse n
     | unMod (firstDigit n) `gcd` radix n == 1 = Just (1/n)
     | otherwise = Nothing
 
-normalize n@(Q v _) | v > precision n = 0
-normalize n@(Q v u) = case d of
-  0 -> normalize (Q (v + ilog p pk) u)
-  d -> go v (unMod d)
+normalize :: (Radix p, Padic n, Padic (Unit n), LiftedDigits (Unit n) ~ [Lifted p])
+          => n -> n
+normalize n = case d of
+      0 -> fromUnit (u, v + ilog p pk)
+      Lifted x -> go v (fromIntegral (unMod x))
   where
+    (u, v) = splitUnit n
     d:ds = liftedDigits u
-    go v x
-      | unMod x `mod` p == 0 = go (v + 1) (x `div` p)
-      | otherwise = Q v (Z x:ds)
+    go k x
+      | k >= pr = 0
+      | x `mod` p == 0 = go (k + 1) (x `div` p)
+      | otherwise = fromUnit (mkUnit (fromIntegral x:ds), k)
     p = radix n
     pk = radix d
+    pr = precision n
 
   
 instance Radix p => Num (Q p) where
-  fromInteger n = Q 0 (fromInteger n)
-  a + b = Q v (p ^ (va - v) * unit a + p ^ (vb - v) * unit b)
+  fromInteger n = res
+    where
+      (u, v) = getUnitZ (radix res) n
+      res = Q (fromInteger u) v
+  a + b = normalize $ Q (p ^ (va - v) * unit a + p ^ (vb - v) * unit b) v
     where
       va = valuation a
       vb = valuation b
       v = va `min` vb
       p = radix a
-  a * b = Q (valuation a + valuation b) (unit a * unit b)
-  negate (Q v u) = Q v (negate u)
+  a * b = normalize $ Q (unit a * unit b) (valuation a + valuation b)
+  negate (Q u v) = Q (negate u) v
   abs = id
   signum 0 = 0
   signum _ = 1
@@ -616,15 +640,15 @@ instance Radix p => Fractional (Q p) where
   fromRational 0 = 0
   fromRational x = res
     where
-      res = Q v (fromDigits (series n))
+      res = Q (fromDigits (series n)) v
       p = radix res
-      (q, v) = getUnit p x
+      (q, v) = getUnitQ p x
       (n, d) = (fromIntegral $ numerator q, fromIntegral $ denominator q)
       series 0 = repeat 0
       series n =
         let m = fromIntegral n / fromIntegral d
          in m : series ((n - fromIntegral (unMod m) * d) `div` p)
-  a / b = Q (valuation a - valuation b) res
+  a / b = normalize $ Q res (valuation a - valuation b)
     where
       res =
         case divMaybe (unit a) (unit b) of
@@ -639,19 +663,25 @@ instance (Radix p) => Real (Q p) where
 
 ------------------------------------------------------------
 
+getUnitZ :: Integer -> Integer -> (Integer, Int)
+getUnitZ _ 0 = (0, 0)
+getUnitZ p x = (b, length v)
+  where
+    (v, b:_) = span (\n -> n `mod` p == 0) $ iterate (`div` p) x
+
 -- | Extracts p-adic unit from a rational number. For radix \(p\) and rational number \(x\) returns
 -- pair \((k, r/s)\) such that \(x = r/s \cdot p^k\).
 --
 -- Examples:
--- >>> getUnit 3 (75/157)
+-- >>> getUnitQ 3 (75/157)
 -- (1,25 % 157)
--- >>> getUnit 5 (75/157)
+-- >>> getUnitQ 5 (75/157)
 -- (2,3 % 157)
--- >>> getUnit 157 (75/157)
+-- >>> getUnitQ 157 (75/157)
 -- (-1,75 % 1)
-getUnit :: Integral p => p -> Ratio p -> (Ratio p, Int)
-getUnit _ 0 = (0, 0)
-getUnit p x = (c, genericLength v2 - genericLength v1)
+getUnitQ :: Integral p => p -> Ratio p -> (Ratio p, Int)
+getUnitQ _ 0 = (0, 0)
+getUnitQ p x = (c, genericLength v2 - genericLength v1)
   where
     (v1, b:_) =
       span (\n -> denominator n `mod` p == 0) $ iterate (* fromIntegral p) x

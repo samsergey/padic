@@ -47,7 +47,7 @@
 --
 ------------------------------------------------------------
 
-module Math.NumberTheory.Padic
+module Math.NumberTheory.PadicStable
   ( 
   -- * Classes and functions
   -- ** Type synonyms and constraints

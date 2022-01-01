@@ -3,7 +3,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
@@ -36,10 +35,27 @@ instance Radix m => Arbitrary (Z m) where
         b <- suchThat integerZ isInvertible
         return $ a `div` b
 
-instance (KnownNat prec, Arbitrary m) => Arbitrary (m % prec) where
-  arbitrary = Prec <$> arbitrary
+instance (KnownNat prec, Radix m) => Arbitrary (Z' m prec) where
+  arbitrary = oneof [integerZ, rationalZ, arbitraryZ]
+    where
+      integerZ = fromInteger <$> arbitrary
+      arbitraryZ = fromDigits <$> infiniteList
+      rationalZ = do
+        a <- integerZ
+        b <- suchThat integerZ isInvertible
+        return $ a `div` b
 
 instance Radix m => Arbitrary (Q m) where
+  arbitrary = oneof [integerQ, rationalQ, arbitraryQ]
+    where
+      integerQ = fromInteger <$> arbitrary
+      arbitraryQ = fromDigits <$> infiniteList
+      rationalQ = do
+        a <- integerQ
+        b <- suchThat integerQ isInvertible
+        return $ a / b
+
+instance (KnownNat prec, Radix m) => Arbitrary (Q' m prec) where
   arbitrary = oneof [integerQ, rationalQ, arbitraryQ]
     where
       integerQ = fromInteger <$> arbitrary
@@ -75,15 +91,15 @@ digitTests = testGroup "Conversion to and from digits"
 ------------------------------------------------------------
 equivTest :: TestTree
 equivTest = testGroup "Equivalence tests"
-  [ testCase "1" $ (0 :: Z 10 % 5) @?= 432100000
-  , testCase "2" $ (0 :: Z 10 % 5) @/= 543210000
-  , testCase "3" $ (87654321 :: Z 10 % 5) @?= 87054321
-  , testCase "4" $ (87654321 :: Z 10 % 5) @/= 87604321
-  , testCase "5" $ (0 :: Q 10 % 5) @?= 432100000
-  , testCase "6" $ (0 :: Q 10 % 5) @/= 543210000
-  , testCase "7" $ (1/7 :: Q 10 % 5) @?= 57143
-  , testCase "8" $ (1/7 :: Q 10 % 5) @?= 657143
-  , testCase "9" $ (1/7 :: Q 10 % 5) @/= 67143
+  [ testCase "1" $ (0 :: Z' 10 5) @?= 432100000
+  , testCase "2" $ (0 :: Z' 10 5) @/= 543210000
+  , testCase "3" $ (87654321 :: Z' 10 5) @?= 87054321
+  , testCase "4" $ (87654321 :: Z' 10 5) @/= 87604321
+  , testCase "5" $ (0 :: Q' 10 5) @?= 432100000
+  , testCase "6" $ (0 :: Q' 10 5) @/= 543210000
+  , testCase "7" $ (1/7 :: Q' 10 5) @?= 57143
+  , testCase "8" $ (1/7 :: Q' 10 5) @?= 657143
+  , testCase "9" $ (1/7 :: Q' 10 5) @/= 67143
   ]
 
 ------------------------------------------------------------
@@ -114,10 +130,10 @@ showTestZ = testGroup "Z"
   , testCase "-3" $ show (-3 :: Z 3) @?= "(2)0"
   , testCase "123" $ show (123 :: Z 10) @?= "123"
   , testCase "123" $ show (123 :: Z 2) @?= "1111011"
-  , testCase "123456789" $ show (123456789 :: Z 10 % 5) @?= "…56789"
+  , testCase "123456789" $ show (123456789 :: Z' 10 5) @?= "…56789"
   , testCase "-123" $ show (-123 :: Z 10) @?= "(9)877"
   , testCase "1/23" $ show (1 `div` 23 :: Z 10) @?= "…65217391304347826087"
-  , testCase "1/23" $ show (1 `div` 23 :: Z 10 % 40) @?= "(6956521739130434782608)7"
+  , testCase "1/23" $ show (1 `div` 23 :: Z' 10 40) @?= "(6956521739130434782608)7"
   , testCase "123456" $ show (123456 :: Z 257) @?= "1 223 96"
   , testCase "123456" $ show (-123456 :: Z 257) @?= "(256) 255 33 161"
   ]
@@ -132,11 +148,11 @@ showTestQ = testGroup "Q"
   , testCase "1/2" $ show (1/2 :: Q 2) @?= "0.1"
   , testCase "-1/2" $ show (-1/2 :: Q 2) @?= "(1).1"
   , testCase "1/15" $ show (1/15 :: Q 3) @?= "(1210).2"
-  , testCase "1/15" $ show (1/15 :: Q 3 % 60) @?= "(1210).2"
+  , testCase "1/15" $ show (1/15 :: Q' 3 60) @?= "(1210).2"
   , testCase "1/700" $ show (1/700 :: Q 10) @?= "(428571).43"
   , testCase "100/7" $ show (100/7 :: Q 10) @?= "(285714)300.0"
   , testCase "1/23" $ show (1/23 :: Q 10) @?= "…65217391304347826087.0"
-  , testCase "1/23" $ show (1/23 :: Q 10 % 40) @?= "(6956521739130434782608)7.0"
+  , testCase "1/23" $ show (1/23 :: Q' 10 40) @?= "(6956521739130434782608)7.0"
   , testCase "123456" $ show (123456 :: Q 257) @?= "1 223 96 . 0"
   , testCase "123456" $ show (-123456 :: Q 257) @?= "(256) 255 33 161 . 0"
   ]
@@ -197,13 +213,13 @@ ringIsoZ s t = testGroup s
 
 ringIsoZTests = testGroup "Ring isomorphism"
   [ ringIsoZ "Z 2" (0 :: Z 2)
-  , ringIsoZ "Z' 2 60" (0 :: Z 2 % 60)
+  , ringIsoZ "Z' 2 60" (0 :: Z' 2 60)
   , ringIsoZ "Z 3" (0 :: Z 3)
-  , ringIsoZ "Z' 3 60" (0 :: Z 3 % 60)
+  , ringIsoZ "Z' 3 60" (0 :: Z' 3 60)
   , ringIsoZ "Z 10" (0 :: Z 10)
-  , ringIsoZ "Z' 10 60" (0 :: Z 10 % 60)
+  , ringIsoZ "Z' 10 60" (0 :: Z' 10 60)
   , ringIsoZ "Z 65535" (0 :: Z 65535)
-  , ringIsoZ "Z' 65535 60" (0 :: Z 65535 % 60)
+  , ringIsoZ "Z' 65535 60" (0 :: Z' 65535 60)
   ]
 
 newtype SmallRational = SmallRational (Rational)
@@ -244,9 +260,9 @@ ringIsoQ s t = testGroup s
     psi = SmallRational . toRational 
 
 ringIsoQTests = testGroup "Ring isomorphism"
-  [ ringIsoQ "Q' 2 33" (0 :: Q 2 % 33)
-  , ringIsoQ "Q' 3 21" (0 :: Q 3 % 21)
-  , ringIsoQ "Q' 257 5" (0 :: Q 257 % 5)
+  [ ringIsoQ "Q' 2 33" (0 :: Q' 2 33)
+  , ringIsoQ "Q' 3 21" (0 :: Q' 3 21)
+  , ringIsoQ "Q' 257 5" (0 :: Q' 257 5)
   ]
 
 ------------------------------------------------------------
@@ -258,12 +274,12 @@ instance Arbitrary AnyRadix where
   
 pAdicUnitTests :: TestTree
 pAdicUnitTests = testGroup "p-adic units."
-  [ testCase "2" $ getUnitQ 2 (4%7) @?= (1 % 7, 2)
-  , testCase "7" $ getUnitQ 7 (4%7) @?= (4 % 1, -1)
-  , testProperty "0" $ \(AnyRadix p) -> getUnitQ @Int p 0 === (0, 0)
-  , testProperty "1" $ \(AnyRadix p) -> getUnitQ @Int p 1 === (1, 0)
+  [ testCase "2" $ getUnit 2 (4%7) @?= (1 % 7, 2)
+  , testCase "7" $ getUnit 7 (4%7) @?= (4 % 1, -1)
+  , testProperty "0" $ \(AnyRadix p) -> getUnit @Int p 0 === (0, 0)
+  , testProperty "1" $ \(AnyRadix p) -> getUnit @Int p 1 === (1, 0)
   , testProperty "p" $
-      \(AnyRadix p) r -> let (u, k) = getUnitQ @Int p r
+      \(AnyRadix p) r -> let (u, k) = getUnit @Int p r
                          in r === fromIntegral p^^k * u
   , testCase "8" $ splitUnit (0 :: Q 2) @?= (0, 20)
   , testCase "9" $ splitUnit (1 :: Q 2) @?= (1, 0)
