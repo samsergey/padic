@@ -8,7 +8,7 @@
 
 module Main where
 
-import Math.NumberTheory.Padic
+import Math.NumberTheory.PadicStable
 import GHC.TypeLits hiding (Mod)
 import GHC.Prim (coerce)
 import Test.Tasty

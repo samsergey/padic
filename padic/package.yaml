@@ -31,6 +31,7 @@ dependencies:
  - tasty-quickcheck
  - tasty-expected-failure
  - QuickCheck
+ - criterion
  
 library:
   source-dirs: src

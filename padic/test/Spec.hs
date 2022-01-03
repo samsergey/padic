@@ -35,9 +35,11 @@ instance Radix m => Arbitrary (Z m) where
         a <- integerZ
         b <- suchThat integerZ isInvertible
         return $ a `div` b
+      shrink _ = []
 
 instance (KnownNat prec, Arbitrary m) => Arbitrary (m % prec) where
   arbitrary = Prec <$> arbitrary
+  shrink _ = []
 
 instance Radix m => Arbitrary (Q m) where
   arbitrary = oneof [integerQ, rationalQ, arbitraryQ]
@@ -48,6 +50,7 @@ instance Radix m => Arbitrary (Q m) where
         a <- integerQ
         b <- suchThat integerQ isInvertible
         return $ a / b
+  shrink _ = []
 
 a @/= b = assertBool "" (a /= b)
 
@@ -79,7 +82,7 @@ equivTest = testGroup "Equivalence tests"
   , testCase "2" $ (0 :: Z 10 % 5) @/= 543210000
   , testCase "3" $ (87654321 :: Z 10 % 5) @?= 87054321
   , testCase "4" $ (87654321 :: Z 10 % 5) @/= 87604321
-  , testCase "5" $ (0 :: Q 10 % 5) @?= 432100000
+  , testCase "5" $ (432100000 :: Q 10 % 5) @?= 0
   , testCase "6" $ (0 :: Q 10 % 5) @/= 543210000
   , testCase "7" $ (1/7 :: Q 10 % 5) @?= 57143
   , testCase "8" $ (1/7 :: Q 10 % 5) @?= 657143
@@ -103,6 +106,7 @@ cycleTest = testGroup "findCycle tests"
   , testCase "12" $ findCycle 200 ([1..99] ++ cycle [100..200]) @?= ([1..99],[100..200])
   ]
 
+------------------------------------------------------------
 
 ------------------------------------------------------------
 showTests = testGroup "String representation"
@@ -118,6 +122,7 @@ showTestZ = testGroup "Z"
   , testCase "-123" $ show (-123 :: Z 10) @?= "(9)877"
   , testCase "1/23" $ show (1 `div` 23 :: Z 10) @?= "…65217391304347826087"
   , testCase "1/23" $ show (1 `div` 23 :: Z 10 % 40) @?= "(6956521739130434782608)7"
+  , testCase "1/23" $ show (1 `div` 23 :: Z 17 % 5) @?= "… 8 14 13 5 3"
   , testCase "123456" $ show (123456 :: Z 257) @?= "1 223 96"
   , testCase "123456" $ show (-123456 :: Z 257) @?= "(256) 255 33 161"
   ]
@@ -137,40 +142,41 @@ showTestQ = testGroup "Q"
   , testCase "100/7" $ show (100/7 :: Q 10) @?= "(285714)300.0"
   , testCase "1/23" $ show (1/23 :: Q 10) @?= "…65217391304347826087.0"
   , testCase "1/23" $ show (1/23 :: Q 10 % 40) @?= "(6956521739130434782608)7.0"
+  , testCase "1/23" $ show (1/23 :: Q 17 % 5) @?= "… 8 14 13 5 3 . 0"
   , testCase "123456" $ show (123456 :: Q 257) @?= "1 223 96 . 0"
   , testCase "123456" $ show (-123456 :: Q 257) @?= "(256) 255 33 161 . 0"
   ]
 
 ------------------------------------------------------------
 
-homo0 :: Eq a => (a -> t) -> (t -> a) -> t -> a -> Bool
+homo0 :: (Show a, Eq a) => (a -> t) -> (t -> a) -> t -> a -> Property
 homo0 phi psi w a =
-  let [x, _] = [phi a, w] in psi x == a
+  let [x, _] = [phi a, w] in psi x === a
 
-homo1 :: Eq t => (a -> t)
+homo1 :: (Show t , Eq t) => (a -> t)
       -> (a -> a -> a)
       -> (t -> t -> t)
-      -> t -> a -> a -> Bool
+      -> t -> a -> a -> Property
 homo1 phi opa opt w a b =
   let [x, y, _] = [phi a, phi b, w]
-  in x `opt` y == phi (a `opa` b)
+  in x `opt` y === phi (a `opa` b)
 
-homo2 :: Eq a => (a -> t) -> (t -> a)
+homo2 :: (Show a, Eq a) => (a -> t) -> (t -> a)
       -> (a -> a -> a)
       -> (t -> t -> t)
-      -> t -> a -> a -> Bool
+      -> t -> a -> a -> Property
 homo2 phi psi opa opt w a b =
   let [x, y, _] = [phi a, phi b, w]
-  in psi (x `opt` y) == a `opa` b
+  in psi (x `opt` y) === a `opa` b
 
-invOp :: Eq t => (a -> t) 
+invOp :: (Show t, Eq t) => (a -> t) 
       -> (t -> t -> t) 
       -> (t -> t)
       -> (t -> Bool)
       -> t -> a -> a -> Property
 invOp phi op inv p w a b =
   let [x, y, _] = [phi a, phi b, w]
-  in p y ==> (x `op` y) `op` inv y == x 
+  in p y ==> (x `op` y) `op` inv y === x 
   
 
 ringIsoZ ::
@@ -197,13 +203,13 @@ ringIsoZ s t = testGroup s
 
 ringIsoZTests = testGroup "Ring isomorphism"
   [ ringIsoZ "Z 2" (0 :: Z 2)
-  , ringIsoZ "Z' 2 60" (0 :: Z 2 % 60)
+  , ringIsoZ "Z 2 % 60" (0 :: Z 2 % 60)
   , ringIsoZ "Z 3" (0 :: Z 3)
-  , ringIsoZ "Z' 3 60" (0 :: Z 3 % 60)
+  , ringIsoZ "Z 3 % 60" (0 :: Z 3 % 60)
   , ringIsoZ "Z 10" (0 :: Z 10)
-  , ringIsoZ "Z' 10 60" (0 :: Z 10 % 60)
+  , ringIsoZ "Z 10 % 60" (0 :: Z 10 % 60)
   , ringIsoZ "Z 65535" (0 :: Z 65535)
-  , ringIsoZ "Z' 65535 60" (0 :: Z 65535 % 60)
+  , ringIsoZ "Z 65535 % 60" (0 :: Z 65535 % 60)
   ]
 
 newtype SmallRational = SmallRational (Rational)
@@ -214,7 +220,7 @@ instance Arbitrary SmallRational where
     n <- chooseInteger (-65535,65535)
     d <- chooseInteger (1,65535)
     return $ SmallRational (n % d)
-  shrink (SmallRational r) = SmallRational <$> shrink r
+  shrink (SmallRational r) = SmallRational <$> []
   
 ringIsoQ ::
      ( ValidRadix m
@@ -237,18 +243,19 @@ ringIsoQ s t = testGroup s
   , testProperty "inversion Qp" $ invOp phi (*) (1 /) isInvertible t
   , ringLaws t
   ]
-  where
-    phi :: (Fractional n, Real n) => SmallRational -> n
-    phi (SmallRational r) = fromRational r
-    psi :: (Fractional n, Real n) => n -> SmallRational
-    psi = SmallRational . toRational 
+
+phi :: (Fractional n, Real n) => SmallRational -> n
+phi (SmallRational r) = fromRational r
+psi :: (Fractional n, Real n) => n -> SmallRational
+psi = SmallRational . toRational 
 
 ringIsoQTests = testGroup "Ring isomorphism"
-  [ ringIsoQ "Q' 2 33" (0 :: Q 2 % 33)
-  , ringIsoQ "Q' 3 21" (0 :: Q 3 % 21)
-  , ringIsoQ "Q' 257 5" (0 :: Q 257 % 5)
+  [ ringIsoQ "Q 2 % 33" (0 :: Q 2 % 34)
+  , ringIsoQ "Q 3 % 21" (0 :: Q 3 % 21)
+  , ringIsoQ "Q 257 % 5" (0 :: Q 257 % 5)
   ]
 
+test = ringIsoQ "Q' 2 34" (0 :: Q 2 % 34)
 ------------------------------------------------------------
 newtype AnyRadix = AnyRadix Int
   deriving (Show, Eq, Num)
@@ -265,7 +272,7 @@ pAdicUnitTests = testGroup "p-adic units."
   , testProperty "p" $
       \(AnyRadix p) r -> let (u, k) = getUnitQ @Int p r
                          in r === fromIntegral p^^k * u
-  , testCase "8" $ splitUnit (0 :: Q 2) @?= (0, 20)
+  , testCase "8" $ splitUnit (0 :: Q 2 % 13) @?= (0, 13)
   , testCase "9" $ splitUnit (1 :: Q 2) @?= (1, 0)
   , testCase "10" $ splitUnit (100 :: Q 2) @?= (25, 2)
   , testCase "11" $ splitUnit (1/96 :: Q 2) @?= (1 `div` 3, -5)
@@ -286,13 +293,13 @@ toRadixTests = testGroup "Conversion to and from digits" $
                                   in toRadix p (fromRadix p ds) === ds ]
 ------------------------------------------------------------
 
-addComm :: (Eq a, Num a) => a -> a -> a -> Bool
+addComm :: (Show a, Eq a, Num a) => a -> a -> a -> Bool
 addComm t a b = a + b == b + a
 
-addAssoc :: (Eq a, Num a) => a -> a -> a -> a -> Bool
+addAssoc :: (Show a, Eq a, Num a) => a -> a -> a -> a -> Bool
 addAssoc t a b c = a + (b + c) == (a + b) + c
 
-negInvol :: (Eq a, Num a) => a -> a -> Bool
+negInvol :: (Show a, Eq a, Num a) => a -> a -> Bool
 negInvol t a = - (- a) == a
 
 negInvers :: (Eq a, Num a) => a -> a -> Bool
@@ -334,7 +341,7 @@ ringLaws t = testGroup "Ring laws" $
   , testProperty "Multiplicative zero" $ mulZero t
   , testProperty "Multiplicative one" $ mulOne t
   , testProperty "Multiplication commutativity" $ mulComm t
-  , testProperty "Multiplication assiociativity" $ mulAssoc t
+  , testProperty "Multiplication associativity" $ mulAssoc t
   , testProperty "Multiplication distributivity" $ mulDistr t
   , testProperty "Multiplication signs" $ mulSign t
   ]
