@@ -1,16 +1,41 @@
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_HADDOCK hide, prune, ignore-exports #-}
+
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Math.NumberTheory.Padic.Classes  where
 
-------------------------------------------------------------
+import GHC.TypeLits
+import Data.Constraint (Constraint)
+import GHC.Integer.GMP.Internals (recipModInteger)
 
-class Fixed a where
+------------------------------------------------------------
+-- | Constraint for non-zero natural number which can be a radix.
+type family ValidRadix (m :: Nat) :: Constraint where
+  ValidRadix 0 = TypeError ('Text "Zero radix!")
+  ValidRadix 1 = TypeError ('Text "Radix should be more then 1!")
+  ValidRadix m = ()
+
+-- | Constraint for valid radix of a number
+type Radix m = ( ValidRadix m , KnownNat m)
+
+-- | Constraint for regular p-adic number.
+type family RealPadic n p prec :: Constraint where
+  RealPadic n p prec =
+    ( Padic n
+    , Padic (Unit n)
+    , Real n
+    , Radix p
+    , KnownNat prec
+    )
+  
+------------------------------------------------------------
+-- | Typeclass for digitally representable objects
+class Padic n where
+  -- | A type for p-adic unit.
+  type Unit n
   -- | Returns the precision of a number.
   --
   -- Examples:
@@ -19,22 +44,10 @@ class Fixed a where
   -- 20
   -- >>> precision (123 :: Z' 2 % 40)
   -- 40
-  precision :: Integral i => a -> i
-  -- | Analog of @show@ with specified precision.
-  showPrec :: Int -> a -> String
-  -- | Analog of @==@ with specified precision.
-  eqPrec :: Int -> a -> a -> Bool
-  
+  precision :: Integral i => n -> i
 
-------------------------------------------------------------
--- | Typeclass for digitally representable objects
-class Digital n where
-  -- | A type for digit or a list of digits.
-  type Digits n
-  -- | A type for internal representation of digits
-  type LiftedDigits n
   -- | Constructor for a digital object from it's digits
-  fromDigits :: Digits n -> n
+  fromDigits :: [Int] -> n
   -- | Returns digits of a digital object
   --
   -- Examples:
@@ -45,7 +58,7 @@ class Digital n where
   -- [(1 `modulo` 2),(0 `modulo` 2),(1 `modulo` 2),(0 `modulo` 2),(0 `modulo` 2)]
   -- >>> take 5 $ digits (1/200 :: Q 10)
   -- [(1 `modulo` 2),(0 `modulo` 2),(1 `modulo` 2),(0 `modulo` 2),(0 `modulo` 2)]
-  digits :: n -> Digits n
+  digits :: n -> [Int]
   -- | Returns the radix of a number
   --
   -- Examples:
@@ -63,18 +76,11 @@ class Digital n where
   -- [(123 `modulo` 10000000000000000000),(0 `modulo` 10000000000000000000),(0 `modulo` 10000000000000000000)]
   -- >>> take 3 $ liftedDigits (-123 :: Z 2)
   -- [(9223372036854775685 `modulo` 9223372036854775808),(9223372036854775807 `modulo` 9223372036854775808),(9223372036854775807 `modulo` 9223372036854775808)]
-  liftedDigits :: n -> LiftedDigits n
+  lifted :: n -> Integer
+
   -- | Creates digital object from it's lifted digits.
-  mkUnit :: LiftedDigits n -> n
+  mkUnit :: Integer -> n
 
--- | The least significant digit of a p-adic number.
-firstDigit n = head (digits n)
-
-------------------------------------------------------------
--- | Typeclass for p-adic numbers
-class (Num n, Digital n, Fixed n) => Padic n where
-  -- | A type for p-adic unit.
-  type Unit n
   -- | Creates p-adic number from given unit and valuation.
   --
   -- prop> fromUnit (u, v) = u * p^v
@@ -83,9 +89,11 @@ class (Num n, Digital n, Fixed n) => Padic n where
   --
   -- prop> splitUnit (u * p^v) = (u, v)
   splitUnit :: n -> (Unit n, Int)
-  -- | Partial multiplicative inverse of p-adic number (defined both for integer or rational p-adics).
-  inverse :: n -> Maybe n
   
+
+-- | The least significant digit of a p-adic number.
+firstDigit n = head (digits n)
+
 -- | returns the unit of a number
 --
 -- Examples:
@@ -123,9 +131,26 @@ valuation = snd . splitUnit
 -- 0.1
 -- >>> norm (75 :: Z 5)
 -- 4.0e-2
-norm :: (Fractional f, Padic n) => n -> f
-norm n = fromIntegral (radix n) ^^ (-valuation n)
+norm :: (Integral f, Fractional f, Padic n) => n -> f
+norm n = radix n ^^ (-valuation n)
 
 -- | Returns @True@ for a p-adic number which is equal to zero (within it's precision).
 isZero :: Padic n => n -> Bool
 isZero n = valuation n >= precision n
+
+-- | Returns @True@ for a p-adic number which is invertible.
+isInvertible :: Padic n => n -> Bool
+isInvertible n = (lifted n `mod` p) `gcd` p == 1
+  where
+    p = radix n
+  
+-- | Partial multiplicative inverse of p-adic number (defined both for integer or rational p-adics).
+inverse :: Padic n => n -> Maybe n
+inverse n
+  | isInvertible n = Just (mkUnit $ recipModInteger (lifted n) pk)
+  | otherwise = Nothing
+  where
+    pk = liftedMod n
+
+liftedMod :: (Padic n, Integral a) => n -> a
+liftedMod n = radix n ^ (2*precision n + 1)
