@@ -21,7 +21,7 @@ import Math.NumberTheory.Padic.Integer
 type Q p = Q' p 20
 
 -- |  Rational p-adic number with explicitly specified precision.
-data Q' (p :: Nat) (prec :: Nat) = Q' (Z' p prec) Int
+newtype Q' (p :: Nat) (prec :: Nat) = Q' (Z' p prec, Int)
 
 instance (Radix p, KnownNat prec) => Show (Q' p prec) where
   show n = si ++ sep ++ "." ++ sep ++ sf
@@ -37,10 +37,10 @@ instance (Radix p, KnownNat prec) => Show (Q' p prec) where
       sf = intercalate sep $ show <$> reverse f
       si =
         case findCycle pr i of
-          ([], [0]) -> "0"
-          (pref, []) -> ell ++ toString pref
-          (pref, [0]) -> toString pref
-          (pref, cyc)
+          Nothing
+            | length i > pr -> ell ++ toString (take pr i)
+            | otherwise -> toString (take pr i)
+          Just (pref, cyc)
             | length pref + length cyc <= pr ->
               let sp = toString pref
                   sc = toString cyc
@@ -57,19 +57,19 @@ instance (Radix p, KnownNat prec) => Padic (Q' p prec) where
 
   precision = fromIntegral . natVal
 
-  radix (Q' u _) = radix u
+  radix (Q' (u, _)) = radix u
 
-  digits (Q' u v) = replicate v 0 ++ toRadix (radix u) (lifted u)
+  digits (Q' (u, v)) = replicate v 0 ++ toRadix (radix u) (lifted u)
 
-  fromDigits ds = normalize $ Q' (fromDigits ds) 0
+  fromDigits ds = normalize $ Q' (fromDigits ds, 0)
 
-  lifted (Q' u _) = lifted u
+  lifted (Q' (u, _)) = lifted u
 
-  mkUnit ds = normalize $ Q' (mkUnit ds) 0
+  mkUnit ds = normalize $ Q' (mkUnit ds, 0)
 
-  fromUnit (u, v) = Q' u v
+  fromUnit = Q'
 
-  splitUnit (Q' u v) = (u, v)
+  splitUnit (Q' (u, v)) = (u, v)
   
 
 {- | Adjusts unit and valuation of p-adic number, by removing trailing zeros from the right-side of the unit.
@@ -84,22 +84,23 @@ Examples:
 >>> splitUnit (normalize x)
 (37,2) -}
 normalize :: (Radix p, KnownNat prec) => Q' p prec -> Q' p prec
-normalize n@(Q' u v) = go (lifted u) v
+normalize n@(Q' (u, v)) = go (lifted u) v
   where
-    go _ k | k >= pr = undefined -- 0
+    go _ k | k >= pr = zero
     go d k = case getUnitZ p d of
-      (0, 0) -> undefined -- 0
+      (0, 0) -> zero
       (d', k')
-        | k + k' >= pr -> undefined -- 0
+        | k + k' >= pr -> zero
         | otherwise ->
           let s = p ^ fromIntegral k'
           in fromUnit (mkUnit d', k + k')
     p = radix u
     pr = precision n
+    zero = Q' (0, pr)
 
 instance (Radix p, KnownNat prec) => Eq (Q' p prec) where
   a == b =
-    (isZero a && isZero b)
+    (isZero a' && isZero b')
     || (valuation a' == valuation b' && unit a' == unit b')
     where
       a' = normalize a
@@ -109,46 +110,39 @@ instance (Radix p, KnownNat prec) => Ord (Q' p prec) where
   compare = error "Order is nor defined for p-adics."
 
 instance (Radix p, KnownNat prec) => Num (Q' p prec) where
-  fromInteger n = normalize $ Q' (fromInteger n) 0
+  fromInteger n = Q' (fromInteger n, 0)
           
-  a + b = Q' (p ^ (va - v) * unit a + p ^ (vb - v) * unit b) v
+  a + b = Q' (p ^ (va - v) * unit a + p ^ (vb - v) * unit b, v)
     where
       va = valuation a
       vb = valuation b
       v = va `min` vb
       p = radix a
-  a * b = Q' (unit a * unit b) (valuation a + valuation b)
-  negate (Q' u v) = Q' (negate u) v
+  a * b = Q' (unit a * unit b, valuation a + valuation b)
+  negate (Q' (u, v)) = Q' (negate u, v)
   abs = id
   signum 0 = 0
   signum _ = 1
 
- {- 
 instance (Radix p, KnownNat prec) => Fractional (Q' p prec) where
   fromRational 0 = 0
   fromRational x = res
     where
-      res = normalize $ Q' (fromDigits (series n)) v
+      res = Q' (n `div` d, v)
       p = radix res
       (q, v) = getUnitQ p x
-      (n, d) = (fromIntegral $ numerator q, fromIntegral $ denominator q)
-      series 0 = repeat 0
-      series n =
-        let m = fromIntegral n / fromIntegral d
-         in m : series ((n - fromIntegral (unMod m) * d) `div` p)
-  a / b = Q' res (valuation a - valuation b')
+      (n, d) = (mkUnit $ numerator q, mkUnit $ denominator q)
+  a / b = Q' (res, valuation a - valuation b')
     where
       b' = normalize b
-      res =
-        case divMaybe (unit a) (unit b') of
-          Nothing ->
-            error $
-            show b ++ " is indivisible in " ++ show (radix a) ++ "-adics!"
-          Just r -> r
--}
---instance (Radix p, KnownNat prec) => Real (Q' p prec) where
---  toRational 0 = 0
---  toRational n = ratDecomposition (precision n) n 
+      res
+        | isInvertible b = unit a `div` unit b'
+        | otherwise = 
+          error $ show b ++ " is indivisible in " ++ show (radix a) ++ "-adics!"
+
+instance (Radix p, KnownNat prec) => Real (Q' p prec) where
+  toRational n = toRational (unit n') * norm n'
+    where n' = normalize n
 
 ------------------------------------------------------------
 

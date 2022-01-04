@@ -65,57 +65,47 @@ module Math.NumberTheory.Padic
   -- * Classes and functions
   -- ** Type synonyms and constraints
     ValidRadix
-  , LiftedRadix
-  , Lifted
   , Radix
-  -- ** Digital objects
-  , Digital
-  , Digits
-  , radix
-  , digits
-  , fromDigits
-  , liftedDigits
-  , mkUnit
-  , firstDigit
   -- ** p-adic numbers
   , Padic
   , Unit
+  , radix
+  , precision
+  , digits
+  , firstDigit
+  , fromDigits
+  , lifted
+  , mkUnit
   , splitUnit
   , fromUnit
-  , inverse
   , unit
   , valuation
   , norm
   , normalize
   , isZero
-  -- ** Objects with fixed precision
-  , Fixed
-  , precision
-  , showPrec
-  , eqPrec
-  , type (%) (..)
-    -- * Data types
-    -- ** p-Adic integers
-  , Z
-  , Q
-  -- * Functions and utilities
+  , inverse
   , isInvertible
+  -- * Data types
+  -- ** p-Adic integers
+  , Z
+  , Z'
+  -- ** p-Adic rationals
+  , Q
+  , Q'
+  -- * Functions and utilities
   , fromRadix
   , toRadix
-  , findCycle
   , sufficientPrecision
-  , getUnitQ
-  , getUnitZ
   , henselLifting
   ) where
 
 import Data.Maybe
-import Data.Mod
 import Control.Monad
+import GHC.Integer.Logarithms (integerLogBase#)
+import GHC.Integer (smallInteger)
 import Math.NumberTheory.Padic.Classes
-import Math.NumberTheory.Padic.Integer hiding (Z (..))
+import Math.NumberTheory.Padic.Integer
 import Math.NumberTheory.Padic.Rational
-import Math.NumberTheory.Padic.Precision ()
 
 ------------------------------------------------------------
 -- | For given radix /p/ and natural number /m/ returns precision sufficient for rational
@@ -124,13 +114,13 @@ import Math.NumberTheory.Padic.Precision ()
 -- Examples:
 --
 -- >>> sufficientPrecision 2 (maxBound :: Int)
--- 65
+-- 64
 -- >>> sufficientPrecision 3 (maxBound :: Int)
 -- 41
--- >>> sufficientPrecision 11 (maxBound :: Int)
--- 19
+-- >>> sufficientPrecision 10 (maxBound :: Int)
+-- 20
 sufficientPrecision :: (Integral a) => Integer -> a -> Integer
-sufficientPrecision p m = ilog p (2 * fromIntegral m) + 1
+sufficientPrecision p m = smallInteger (integerLogBase# p (2 * fromIntegral m)) + 1
 
  
 -- | p-Adic solution of the equation via Newton method.
@@ -141,20 +131,24 @@ sufficientPrecision p m = ilog p (2 * fromIntegral m) + 1
 -- [0,1,…92256259918212890625,…07743740081787109376]
 -- 
 henselLifting ::
-     (Eq n, Padic n, Digits n ~ [Mod p], Radix p)
+     (Eq n, Num n, Padic n)
   => (n -> n) -- ^ Function to be vanished.
   -> (n -> n) -- ^ Derivative of the function.
   -> [n] -- ^ The result.
 henselLifting f f' = res
   where
     pr = precision (head res)
-    mf = firstDigit . f . fromMod
-    res = do
-      r <- fromMod <$> filter (\x -> mf x == 0) [0..]
-      iterateM pr step r
+    res = findSolutionMod f >>= iterateM pr step
     step x = do
       invf' <- maybeToList (inverse (f' x))
       return (x - f x * invf')
+
+findSolutionMod :: (Num n, Padic n) => (n -> n) -> [n]
+findSolutionMod f = res
+  where
+    res = [ d | d <- fromInteger <$> [0 .. p - 1]
+            , firstDigit (f d) `mod` fromInteger p == 0 ]
+    p = radix (head res)
 
 iterateM :: (Eq a, Monad m) => Int -> (a -> m a) -> a -> m a
 iterateM n f = go n

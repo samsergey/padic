@@ -7,6 +7,7 @@
 
 module Math.NumberTheory.Padic.Classes  where
 
+import Data.Ratio
 import GHC.TypeLits
 import Data.Constraint (Constraint)
 import GHC.Integer.GMP.Internals (recipModInteger)
@@ -131,14 +132,14 @@ valuation = snd . splitUnit
 -- 0.1
 -- >>> norm (75 :: Z 5)
 -- 4.0e-2
-norm :: (Integral f, Fractional f, Padic n) => n -> f
-norm n = radix n ^^ (-valuation n)
+norm :: (Integral i, Padic n) => n -> Ratio i
+norm n = (radix n % 1) ^^ (-valuation n)
 
 -- | Returns @True@ for a p-adic number which is equal to zero (within it's precision).
 isZero :: Padic n => n -> Bool
 isZero n = valuation n >= precision n
 
--- | Returns @True@ for a p-adic number which is invertible.
+-- | Returns @True@ for a p-adic number which is multiplicatively invertible.
 isInvertible :: Padic n => n -> Bool
 isInvertible n = (lifted n `mod` p) `gcd` p == 1
   where

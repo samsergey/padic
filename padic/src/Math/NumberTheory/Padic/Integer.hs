@@ -25,19 +25,20 @@ newtype Z' (p :: Nat) (prec :: Nat) = Z' (Z_ p)
 newtype Z_ (p :: Nat) = Z_ Integer
 
 instance (Radix p, KnownNat prec) => Show (Z' p prec) where
+  show 0 = "0"
   show n =  
-    case findCycle pr (digits n) of
-      (pref, [])
-        | all (== 0) (take pr pref) -> "0"
-        | length pref > pr -> ell ++ toString (take pr pref)
-        | otherwise -> toString pref
-      (pref, cyc)
+    case findCycle pr ds of
+      Nothing
+        | length ds > pr -> ell ++ toString (take pr ds)
+        | otherwise -> toString (take pr ds)
+      Just (pref, cyc)
         | length pref + length cyc <= pr ->
           let sp = toString pref
               sc = toString cyc
            in "(" ++ sc ++ ")" ++ sep ++ sp
         | otherwise -> ell ++ toString (take pr $ pref ++ cyc)
     where
+      ds = digits n
       pr = precision n
       toString = intercalate sep . map show . reverse
       ell = "…" ++ sep 
@@ -111,19 +112,19 @@ instance (Radix p, KnownNat prec) => Ord (Z' p prec) where
 
 -- | For a given list extracts prefix and a cycle, limiting length of prefix and cycle by @len@.
 -- Uses the modified tortiose and hare method.
-findCycle :: Eq a => Int -> [a] -> ([a], [a])
+findCycle :: Eq a => Int -> [a] -> Maybe ([a], [a])
 findCycle len lst =
   case tortoiseHare rest of
-    Just (a, c) -> clean $ rollback (pref ++ a, c)
-    Nothing -> (pref, [])
+    Just (a, c) -> test $ clean $ rollback (pref ++ a, c)
+    Nothing -> Nothing
   where
     (pref, rest) = splitAt (len `div` 2) lst
     tortoiseHare x =
       fmap (fmap fst) . listToMaybe $
       dropWhile (\(_, (a, b)) -> notCycle a b) $
       zip (inits x) $
-      zipWith splitAt [1 .. len] $ zipWith take [4,8 ..] $ tails x
-    notCycle a b = not (concat (replicate 3 a) == b)
+      zipWith splitAt [1 .. len] $ zipWith take [3,6 ..] $ tails x
+    notCycle a b = not (concat (replicate 2 a) == b)
     rollback (as, bs) = go (reverse as, reverse bs)
       where
         go =
@@ -138,6 +139,10 @@ findCycle len lst =
           | length x + length cs > len -> (take len (x ++ c : cs), [])
           | all (c ==) cs -> (x, [c])
         other -> other
+    test (_, []) = Nothing 
+    test (pref, c)
+      | and $ zipWith (==) lst (pref ++ cycle c) = Just (pref, c)
+      | otherwise = Nothing
 
 extEuclid :: Integral i => (Integer, Integer) -> Ratio i
 extEuclid (n, m) = go (m, 0) (n, 1)
@@ -179,7 +184,3 @@ toRadix rad n = unfoldr go n
 -- | Folds a list of digits to a number.
 fromRadix :: (Integral i, Integral d) => i -> [d] -> i
 fromRadix rad = foldr (\x r -> fromIntegral x + r * rad) 0
-  
--- | Returms 'True' for multiplicatively invertible numbers.
-isInvertible n = firstDigit n `gcd` radix n == 1
-
