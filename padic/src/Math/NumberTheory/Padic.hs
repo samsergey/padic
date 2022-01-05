@@ -59,7 +59,6 @@ For a truncated p-adic number \(x = \frac{r}{s}\) the equation
 \( x \cdot s \equiv r\ (\mathrm{mod}\ p^k)\) is solved by extended Euclidean method.
 -}
 ------------------------------------------------------------
-
 module Math.NumberTheory.Padic
   ( 
   -- * Classes and functions
@@ -69,6 +68,7 @@ module Math.NumberTheory.Padic
   -- ** p-adic numbers
   , Padic
   , Unit
+  , Digit
   , radix
   , precision
   , digits
@@ -96,42 +96,49 @@ module Math.NumberTheory.Padic
   , fromRadix
   , toRadix
   , sufficientPrecision
+  , findSolutionMod
   , henselLifting
   ) where
 
 import Data.Maybe
+import Data.Mod
 import Control.Monad
 import GHC.Integer.Logarithms (integerLogBase#)
 import GHC.Integer (smallInteger)
+import GHC.TypeLits hiding (Mod)
 import Math.NumberTheory.Padic.Classes
 import Math.NumberTheory.Padic.Integer
 import Math.NumberTheory.Padic.Rational
 
+
 ------------------------------------------------------------
--- | For given radix /p/ and natural number /m/ returns precision sufficient for rational
--- reconstruction of fractions with numerator and denominator not exceeding /m/.
---
--- Examples:
---
--- >>> sufficientPrecision 2 (maxBound :: Int)
--- 64
--- >>> sufficientPrecision 3 (maxBound :: Int)
--- 41
--- >>> sufficientPrecision 10 (maxBound :: Int)
--- 20
+{- | For given radix \(p\) and natural number \(m\) returns precision sufficient for rational
+reconstruction of fractions with numerator and denominator not exceeding \(m\).
+
+Examples:
+
+>>> sufficientPrecision 2 (maxBound :: Int)
+64
+>>> sufficientPrecision 3 (maxBound :: Int)
+41
+>>> sufficientPrecision 10 (maxBound :: Int)
+20
+-}
 sufficientPrecision :: (Integral a) => Integer -> a -> Integer
 sufficientPrecision p m = smallInteger (integerLogBase# p (2 * fromIntegral m)) + 1
 
- 
--- | p-Adic solution of the equation via Newton method.
---
--- Examples:
---
--- >>> henselLifting (\x -> x*x - x) (\x -> 2*x-1) :: [Z 10]
--- [0,1,…92256259918212890625,…07743740081787109376]
--- 
+  
+{- | Returns p-adic solution of the equation \(f(x) = 0\) by Hensel lifting solutions of \(f(x) = 0\ \mathrm{mod}\ p\).
+
+Examples:
+
+>>> henselLifting (\x -> x*x - 2) (\x -> 2*x) :: [Z 7]
+[…64112011266421216213,…02554655400245450454]
+>>> henselLifting (\x -> x*x - x) (\x -> 2*x-1) :: [Q 10]
+[0,1,…92256259918212890625,…07743740081787109376]
+-}
 henselLifting ::
-     (Eq n, Num n, Padic n)
+     (Eq n, Num n, Padic n, Radix p, Digit n ~ Mod p)
   => (n -> n) -- ^ Function to be vanished.
   -> (n -> n) -- ^ Derivative of the function.
   -> [n] -- ^ The result.
@@ -143,12 +150,19 @@ henselLifting f f' = res
       invf' <- maybeToList (inverse (f' x))
       return (x - f x * invf')
 
-findSolutionMod :: (Num n, Padic n) => (n -> n) -> [n]
-findSolutionMod f = res
+{- | Returns solution of the equation \(f(x) = 0\ \mathrm{mod}\ p\) in p-adics.
+
+>>> findSolutionMod (\x -> x*x - 2) :: [Z 7]
+[3,4]
+>>> findSolutionMod (\x -> x*x - x) :: [Q 10]
+[0.0,1.0,5.0,6.0]
+-}
+findSolutionMod :: (Padic n, Radix p, Digit n ~ Mod p) => (n -> n) -> [n]
+findSolutionMod f = [ fromMod d | d <- [0..], fm d == 0 ]
   where
-    res = [ d | d <- fromInteger <$> [0 .. p - 1]
-            , firstDigit (f d) `mod` fromInteger p == 0 ]
-    p = radix (head res)
+    fm = toMod . f . fromMod
+    fromMod x = fromDigits [x]
+    toMod n = lifted n `mod` radix n
 
 iterateM :: (Eq a, Monad m) => Int -> (a -> m a) -> a -> m a
 iterateM n f = go n

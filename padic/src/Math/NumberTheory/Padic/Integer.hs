@@ -8,9 +8,10 @@
 module Math.NumberTheory.Padic.Integer where
 
 import Data.List
+import Data.Mod
 import Data.Ratio
-import Data.Maybe (listToMaybe, maybeToList)
-import GHC.TypeLits
+import Data.Maybe (listToMaybe)
+import GHC.TypeLits hiding (Mod)
 
 import Math.NumberTheory.Padic.Classes
 
@@ -40,7 +41,8 @@ instance (Radix p, KnownNat prec) => Show (Z' p prec) where
     where
       ds = digits n
       pr = precision n
-      toString = intercalate sep . map show . reverse
+      toString = intercalate sep . map showD . reverse
+      showD = show . unMod 
       ell = "…" ++ sep 
       sep
         | radix n < 11 = ""
@@ -48,15 +50,13 @@ instance (Radix p, KnownNat prec) => Show (Z' p prec) where
 
 instance (Radix p, KnownNat prec) => Padic (Z' p prec) where
   type Unit (Z' p prec) = Z' p prec
+  type Digit (Z' p prec) = Mod p 
 
   precision = fromIntegral . natVal
 
-  fromDigits ds = res
-    where
-      res = mkUnit $ fromRadix p ds
-      p = radix res
+  fromDigits = mkUnit . fromRadix
 
-  digits n = toRadix (radix n) (lifted n)
+  digits n = toRadix (lifted n)
 
   radix (Z' n) = fromIntegral $ natVal n
 
@@ -171,16 +171,20 @@ getUnitZ p x = (b, length v)
     (v, b:_) = span (\n -> n `mod` p == 0) $ iterate (`div` p) x
 
 
--- | Unfolds a number to a list of digits.  
-toRadix :: (Integral i, Integral d) => i -> i -> [d]
-toRadix _ 0 = [0]
-toRadix rad n = unfoldr go n
+-- | Unfolds a number to a list of digits (integers modulo @p@).  
+toRadix :: (Integral i, Radix p) => i -> [Mod p]
+toRadix 0 = [0]
+toRadix n = res
   where
+    res = unfoldr go n
+    p = fromIntegral $ natVal $ head $ 0 : res
     go 0 = Nothing
     go x =
-      let (q, r) = quotRem x rad
+      let (q, r) = quotRem x p
        in Just (fromIntegral r, q)
   
--- | Folds a list of digits to a number.
-fromRadix :: (Integral i, Integral d) => i -> [d] -> i
-fromRadix rad = foldr (\x r -> fromIntegral x + r * rad) 0
+-- | Folds a list of digits (integers modulo @p@) to a number.
+fromRadix :: (Integral i, Radix p) => [Mod p] -> i
+fromRadix ds = foldr (\x r -> fromIntegral (unMod x) + r * p) 0 ds
+  where
+    p = fromIntegral $ natVal $ head $ 0 : ds

@@ -28,7 +28,6 @@ library
       Math.NumberTheory.Padic
       Math.NumberTheory.Padic.Classes
       Math.NumberTheory.Padic.Integer
-      Math.NumberTheory.Padic.Precision
       Math.NumberTheory.Padic.Rational
   other-modules:
       Paths_padic

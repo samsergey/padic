@@ -1,5 +1,3 @@
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -14,7 +12,7 @@ module Main where
 import Math.NumberTheory.Padic
 import Math.NumberTheory.Padic.Classes
 import Math.NumberTheory.Padic.Integer
-import Math.NumberTheory.Padic.Rational
+import Math.NumberTheory.Padic.Rarional
 import GHC.TypeLits hiding (Mod)
 import GHC.Prim (coerce)
 import Test.Tasty
@@ -27,22 +25,30 @@ import Data.Maybe
 import Data.Ratio
 import Data.Word
 
+instance Radix m => Arbitrary (Mod m) where
+  arbitrary = fromInteger <$> arbitrary
+
+
 instance Radix m => Arbitrary (Z m) where
   arbitrary = oneof [integerZ, rationalZ, arbitraryZ]
     where
       integerZ = fromInteger <$> arbitrary
-      arbitraryZ = fromDigits . take 20 <$> infiniteList
+      arbitraryZ = fromDigits <$> infiniteList
       rationalZ = do
         a <- integerZ
         b <- suchThat integerZ isInvertible
         return $ a `div` b
       shrink _ = []
 
+instance (KnownNat prec, Arbitrary m) => Arbitrary (m % prec) where
+  arbitrary = Prec <$> arbitrary
+  shrink _ = []
+
 instance Radix m => Arbitrary (Q m) where
   arbitrary = oneof [integerQ, rationalQ, arbitraryQ]
     where
       integerQ = fromInteger <$> arbitrary
-      arbitraryQ = fromDigits . take 20 <$> infiniteList
+      arbitraryQ = fromDigits <$> infiniteList
       rationalQ = do
         a <- integerQ
         b <- suchThat integerQ isInvertible
@@ -50,7 +56,7 @@ instance Radix m => Arbitrary (Q m) where
   shrink _ = []
 
 a @/= b = assertBool "" (a /= b)
-{-
+
 ------------------------------------------------------------
 digitsTestZ :: Radix p => Z p -> Bool
 digitsTestZ n = fromDigits (digits n) == n
@@ -364,5 +370,3 @@ testSuite = testGroup "test"
   ]
 
 main = defaultMain testSuite 
--}
-main = print ()

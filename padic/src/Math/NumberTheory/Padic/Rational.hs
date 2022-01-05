@@ -1,10 +1,11 @@
+{-# OPTIONS_HADDOCK hide, prune, ignore-exports #-}
+
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# OPTIONS_HADDOCK hide, prune, ignore-exports #-}
 
 module Math.NumberTheory.Padic.Rational where
 
@@ -34,7 +35,7 @@ instance (Radix p, KnownNat prec) => Show (Q' p prec) where
           EQ -> ([0], ds)
           GT -> ([0], replicate k 0 ++ ds)
           LT -> splitAt (-k) ds
-      sf = intercalate sep $ show <$> reverse f
+      sf = intercalate sep $ showD <$> reverse f
       si =
         case findCycle pr i of
           Nothing
@@ -46,7 +47,8 @@ instance (Radix p, KnownNat prec) => Show (Q' p prec) where
                   sc = toString cyc
                in "(" ++ sc ++ ")" ++ sep ++ sp
             | otherwise -> ell ++ toString (take pr $ pref ++ cyc)
-      toString = intercalate sep . map show . reverse
+      toString = intercalate sep . map showD . reverse
+      showD = show . unMod
       ell = "…" ++ sep
       sep
         | radix n < 11 = ""
@@ -54,12 +56,13 @@ instance (Radix p, KnownNat prec) => Show (Q' p prec) where
 
 instance (Radix p, KnownNat prec) => Padic (Q' p prec) where
   type Unit (Q' p prec) = Z' p prec
+  type Digit (Q' p prec) = Mod p 
 
   precision = fromIntegral . natVal
 
   radix (Q' (u, _)) = radix u
 
-  digits (Q' (u, v)) = replicate v 0 ++ toRadix (radix u) (lifted u)
+  digits (Q' (u, v)) = replicate v 0 ++ toRadix (lifted u)
 
   fromDigits ds = normalize $ Q' (fromDigits ds, 0)
 

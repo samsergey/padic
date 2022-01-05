@@ -31,24 +31,27 @@ type family RealPadic n p prec :: Constraint where
     , Radix p
     , KnownNat prec
     )
-  
+
 ------------------------------------------------------------
 -- | Typeclass for digitally representable objects
 class Padic n where
   -- | A type for p-adic unit.
   type Unit n
+  -- | A type for digits of p-adic expansion.
+  -- This type allows to assure that digits will agree with the radix @p@ of the number.
+  type Digit n
   -- | Returns the precision of a number.
   --
   -- Examples:
   --
   -- >>> precision (123 :: Z 2)
   -- 20
-  -- >>> precision (123 :: Z' 2 % 40)
+  -- >>> precision (123 :: Z' 2 40)
   -- 40
   precision :: Integral i => n -> i
 
   -- | Constructor for a digital object from it's digits
-  fromDigits :: [Int] -> n
+  fromDigits :: [Digit n] -> n
   -- | Returns digits of a digital object
   --
   -- Examples:
@@ -59,7 +62,7 @@ class Padic n where
   -- [(1 `modulo` 2),(0 `modulo` 2),(1 `modulo` 2),(0 `modulo` 2),(0 `modulo` 2)]
   -- >>> take 5 $ digits (1/200 :: Q 10)
   -- [(1 `modulo` 2),(0 `modulo` 2),(1 `modulo` 2),(0 `modulo` 2),(0 `modulo` 2)]
-  digits :: n -> [Int]
+  digits :: n -> [Digit n]
   -- | Returns the radix of a number
   --
   -- Examples:
@@ -73,9 +76,9 @@ class Padic n where
   --
   -- Examples:
   --
-  -- >>> take 3 $ liftedDigits (123 :: Z 10)
+  -- >>> take 3 $ lifted (123 :: Z 10)
   -- [(123 `modulo` 10000000000000000000),(0 `modulo` 10000000000000000000),(0 `modulo` 10000000000000000000)]
-  -- >>> take 3 $ liftedDigits (-123 :: Z 2)
+  -- >>> take 3 $ lifted (-123 :: Z 2)
   -- [(9223372036854775685 `modulo` 9223372036854775808),(9223372036854775807 `modulo` 9223372036854775808),(9223372036854775807 `modulo` 9223372036854775808)]
   lifted :: n -> Integer
 
@@ -119,7 +122,7 @@ unit = fst . splitUnit
 --
 -- >>> valuation (0 :: Q 2)
 -- 20
--- >>> valuation (0 :: Q 2 % 150)
+-- >>> valuation (0 :: Q' 2 150)
 -- 150
 valuation :: Padic n => n -> Int
 valuation = snd . splitUnit
@@ -155,3 +158,4 @@ inverse n
 
 liftedMod :: (Padic n, Integral a) => n -> a
 liftedMod n = radix n ^ (2*precision n + 1)
+
