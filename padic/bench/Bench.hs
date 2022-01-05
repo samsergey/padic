@@ -49,35 +49,36 @@ suite =
   [ bgroup
       "add"
       [ bench "Integer" $ whnf (addBench (0 :: Integer)) 200
-      , bench "Z 2" $ whnf (addBench (0 :: Z 2 % 100)) 200
-      , bench "Z 3" $ whnf (addBench (0 :: Z 3 % 100)) 200 
-      , bench "Z 13" $ whnf (addBench (0 :: Z 13 % 100)) 200
-      , bench "Z 251" $ whnf (addBench (0 :: Z 251 % 100)) 200
-      , bench "Q 2" $ whnf (addBench (0 :: Q 2 % 100)) 200
-      , bench "Q 3" $ whnf (addBench (0 :: Q 3 % 100)) 200
-      , bench "Q 13" $ whnf (addBench (0 :: Q 13 % 100)) 200
-      , bench "Q 251" $ whnf (addBench (0 :: Q 251 % 100)) 200]
+      , bench "Z 2" $ whnf (addBench (0 :: Z' 2 20)) 200
+      , bench "Z 3" $ whnf (addBench (0 :: Z' 3 20)) 200 
+      , bench "Z 13" $ whnf (addBench (0 :: Z' 13 20)) 200
+      , bench "Z 251" $ whnf (addBench (0 :: Z' 251 20)) 200
+      , bench "Q 2" $ whnf (addBench (0 :: Q' 2 20)) 200
+      , bench "Q 3" $ whnf (addBench (0 :: Q' 3 20)) 200
+      , bench "Q 13" $ whnf (addBench (0 :: Q' 13 20)) 200
+      , bench "Q 251" $ whnf (addBench (0 :: Q' 251 20)) 200]
   , bgroup
       "mul"
       [ bench "Integer" $ whnf (mulBench (0 :: Integer)) 200
-      , bench "Z 2" $ whnf (mulBench (0 :: Z 2 % 100)) 200
-      , bench "Z 3" $ whnf (mulBench (0 :: Z 3 % 100)) 200 
-      , bench "Z 13" $ whnf (mulBench (0 :: Z 13 % 100)) 200
-      , bench "Z 251" $ whnf (mulBench (0 :: Z 251 % 100)) 200
-      , bench "Q 2" $ whnf (mulBench (0 :: Q 2 % 100)) 200
-      , bench "Q 3" $ whnf (mulBench (0 :: Q 3 % 100)) 200
-      , bench "Q 13" $ whnf (mulBench (0 :: Q 13 % 100)) 200
-      , bench "Q 251" $ whnf (mulBench (0 :: Q 251 % 100)) 200]
+      , bench "Z 2" $ whnf (mulBench (0 :: Z' 2 20)) 200
+      , bench "Z 3" $ whnf (mulBench (0 :: Z' 3 20)) 200 
+      , bench "Z 13" $ whnf (mulBench (0 :: Z' 13 20)) 200
+      , bench "Z 251" $ whnf (mulBench (0 :: Z' 251 20)) 200
+      , bench "Q 2" $ whnf (mulBench (0 :: Q' 2 20)) 200
+      , bench "Q 3" $ whnf (mulBench (0 :: Q' 3 20)) 200
+      , bench "Q 13" $ whnf (mulBench (0 :: Q' 13 20)) 200
+      , bench "Q 251" $ whnf (mulBench (0 :: Q' 251 20)) 200]
   , bgroup
       "div"
-      [ bench "Z 2" $ whnf (divBench (13 `div` 5) (4 `div` 3 :: Z 2)) 200
+      [ bench "Double" $ whnf (divBench (13 / 5) (4 / 3 :: Double)) 200
+      , bench "Z 2" $ whnf (divBench (13 `div` 5) (4 `div` 3 :: Z 2)) 200
       , bench "Z 3" $ whnf (divBench (13 `div` 4) (7 `div` 5 :: Z 3)) 200
       , bench "Z 13" $ whnf (divBench (13 `div` 4) (4 `div` 3 :: Z 13)) 200
---      , bench "Z 251" $ whnf (divBench (13 `div` 4) (4 `div` 3 :: Z 251)) 200
+      , bench "Z 251" $ whnf (divBench (13 `div` 4) (4 `div` 3 :: Z 251)) 200
       , bench "Q 2" $ whnf (divBench (13 / 4) (4 / 3 :: Q 2)) 200
       , bench "Q 3" $ whnf (divBench (13 / 5) (7 / 5 :: Q 3)) 200
       , bench "Q 13" $ whnf (divBench (13 / 4) (4 / 3 :: Q 13)) 200
---      , bench "Q 251" $ whnf (divBench (13 / 4) (4 / 3 :: Q 251)) 200
+      , bench "Q 251" $ whnf (divBench (13 / 4) (4 / 3 :: Q 251)) 200
       ]
   ]
 

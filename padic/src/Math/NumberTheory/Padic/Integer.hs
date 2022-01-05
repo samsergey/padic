@@ -4,6 +4,9 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE UnliftedFFITypes #-}
 
 module Math.NumberTheory.Padic.Integer where
 
@@ -12,6 +15,8 @@ import Data.Mod
 import Data.Ratio
 import Data.Maybe (listToMaybe)
 import GHC.TypeLits hiding (Mod)
+import GHC.Integer.GMP.Internals
+import GHC.Natural
 
 import Math.NumberTheory.Padic.Classes
 
@@ -27,17 +32,9 @@ newtype Z_ (p :: Nat) = Z_ Integer
 
 instance (Radix p, KnownNat prec) => Show (Z' p prec) where
   show 0 = "0"
-  show n =  
-    case findCycle pr ds of
-      Nothing
-        | length ds > pr -> ell ++ toString (take pr ds)
-        | otherwise -> toString (take pr ds)
-      Just (pref, cyc)
-        | length pref + length cyc <= pr ->
-          let sp = toString pref
-              sc = toString cyc
-           in "(" ++ sc ++ ")" ++ sep ++ sp
-        | otherwise -> ell ++ toString (take pr $ pref ++ cyc)
+  show n  
+    | length ds > pr = ell ++ toString (take pr ds)
+    | otherwise = toString (take pr ds)
     where
       ds = digits n
       pr = precision n
@@ -66,8 +63,9 @@ instance (Radix p, KnownNat prec) => Padic (Z' p prec) where
 
   fromUnit (u, v) = mkUnit $ radix u ^ fromIntegral v * lifted u
 
-  splitUnit n = let (u, v) = getUnitZ (radix n) (lifted n)
-                in (mkUnit u, v)
+  splitUnit n = case getUnitZ (radix n) (lifted n) of
+                  (0, 0) -> (0, precision n)
+                  (u, v) -> (mkUnit u, v)
 
 instance (Radix p, KnownNat prec) => Eq (Z' p prec) where
   x@(Z' (Z_ a)) == (Z' (Z_ b)) = a `mod` pk == b `mod` pk
@@ -118,12 +116,12 @@ findCycle len lst =
     Just (a, c) -> test $ clean $ rollback (pref ++ a, c)
     Nothing -> Nothing
   where
-    (pref, rest) = splitAt (len `div` 2) lst
+    (pref, rest) = splitAt 1 lst
     tortoiseHare x =
       fmap (fmap fst) . listToMaybe $
       dropWhile (\(_, (a, b)) -> notCycle a b) $
       zip (inits x) $
-      zipWith splitAt [1 .. len] $ zipWith take [3,6 ..] $ tails x
+      zipWith splitAt [1 .. len] $ zipWith take [4,8 ..] $ tails x
     notCycle a b = not (concat (replicate 2 a) == b)
     rollback (as, bs) = go (reverse as, reverse bs)
       where
@@ -141,7 +139,7 @@ findCycle len lst =
         other -> other
     test (_, []) = Nothing 
     test (pref, c)
-      | and $ zipWith (==) lst (pref ++ cycle c) = Just (pref, c)
+      | and $ zipWith (==) (take (2*len) lst) (pref ++ cycle c) = Just (pref, c)
       | otherwise = Nothing
 
 extEuclid :: Integral i => (Integer, Integer) -> Ratio i
@@ -188,3 +186,28 @@ fromRadix :: (Integral i, Radix p) => [Mod p] -> i
 fromRadix ds = foldr (\x r -> fromIntegral (unMod x) + r * p) 0 ds
   where
     p = fromIntegral $ natVal $ head $ 0 : ds
+
+
+fromRadixN :: Radix p => [Mod p] -> BigNat
+fromRadixN ds = foldr go zeroBigNat ds
+  where
+    p# = case fromIntegral $ natVal $ head $ 0 : ds of
+      NatJ# x -> x
+      NatS# x -> wordToBigNat x
+    go x r# = let n# = case unMod x of
+                         NatJ# y -> y
+                         NatS# y -> wordToBigNat y
+              in n# `plusBigNat` (r# `timesBigNat` p#)
+
+
+toRadixN :: Radix p => BigNat -> [Mod p]
+toRadixN n = res
+  where
+    res = unfoldr go n
+    p = case fromIntegral $ natVal $ head $ 0 : res of
+      NatJ# x -> x
+      NatS# x -> wordToBigNat x
+    go x | isZeroBigNat x = Nothing
+         | otherwise = let (# q, r #) = quotRemBigNat x p
+                       in Just (fromIntegral (NatJ# r), q)
+

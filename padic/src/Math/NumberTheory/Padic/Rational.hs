@@ -28,27 +28,21 @@ instance (Radix p, KnownNat prec) => Show (Q' p prec) where
   show n = si ++ sep ++ "." ++ sep ++ sf
     where
       pr = precision n
-      k = valuation n
-      ds = digits (unit n)
+      (u, k) = splitUnit (normalize n)
+      ds = digits u
       (f, i) =
-        case compare k 0 of
+        clean <$> case compare k 0 of
           EQ -> ([0], ds)
           GT -> ([0], replicate k 0 ++ ds)
-          LT -> splitAt (-k) ds
-      sf = intercalate sep $ showD <$> reverse f
-      si =
-        case findCycle pr i of
-          Nothing
-            | length i > pr -> ell ++ toString (take pr i)
-            | otherwise -> toString (take pr i)
-          Just (pref, cyc)
-            | length pref + length cyc <= pr ->
-              let sp = toString pref
-                  sc = toString cyc
-               in "(" ++ sc ++ ")" ++ sep ++ sp
-            | otherwise -> ell ++ toString (take pr $ pref ++ cyc)
+          LT -> splitAt (-k) (ds ++ replicate pr 0)
+      sf = toString f
+      si | length i > pr = ell ++ toString (take pr i)
+         | otherwise = toString (take pr i)
       toString = intercalate sep . map showD . reverse
       showD = show . unMod
+      clean s = case dropWhile (== 0) (reverse s) of
+        [] -> [0]
+        x -> reverse x
       ell = "…" ++ sep
       sep
         | radix n < 11 = ""
@@ -87,6 +81,7 @@ Examples:
 >>> splitUnit (normalize x)
 (37,2) -}
 normalize :: (Radix p, KnownNat prec) => Q' p prec -> Q' p prec
+normalize n@(Q' (0, _)) = Q' (0, precision n)
 normalize n@(Q' (u, v)) = go (lifted u) v
   where
     go _ k | k >= pr = zero
@@ -102,18 +97,18 @@ normalize n@(Q' (u, v)) = go (lifted u) v
     zero = Q' (0, pr)
 
 instance (Radix p, KnownNat prec) => Eq (Q' p prec) where
-  a == b =
-    (isZero a' && isZero b')
-    || (valuation a' == valuation b' && unit a' == unit b')
+  a' == b' =
+    (isZero a && isZero b)
+    || (valuation a == valuation b && unit a == unit b)
     where
-      a' = normalize a
-      b' = normalize b
+      a = normalize a'
+      b = normalize b'
 
 instance (Radix p, KnownNat prec) => Ord (Q' p prec) where
   compare = error "Order is nor defined for p-adics."
 
 instance (Radix p, KnownNat prec) => Num (Q' p prec) where
-  fromInteger n = Q' (fromInteger n, 0)
+  fromInteger n = normalize $ Q' (fromInteger n, 0)
           
   a + b = Q' (p ^ (va - v) * unit a + p ^ (vb - v) * unit b, v)
     where
@@ -139,13 +134,12 @@ instance (Radix p, KnownNat prec) => Fractional (Q' p prec) where
     where
       b' = normalize b
       res
-        | isInvertible b = unit a `div` unit b'
+        | isInvertible b' = unit a `div` unit b'
         | otherwise = 
-          error $ show b ++ " is indivisible in " ++ show (radix a) ++ "-adics!"
+          error $ show b' ++ " is indivisible in " ++ show (radix a) ++ "-adics!"
 
 instance (Radix p, KnownNat prec) => Real (Q' p prec) where
-  toRational n = toRational (unit n') * norm n'
-    where n' = normalize n
+  toRational n = toRational (unit n) / norm n
 
 ------------------------------------------------------------
 
