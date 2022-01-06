@@ -10,7 +10,6 @@ module Math.NumberTheory.Padic.Classes  where
 import Data.Ratio
 import GHC.TypeLits
 import Data.Constraint (Constraint)
-import GHC.Integer.GMP.Internals (recipModInteger)
 
 ------------------------------------------------------------
 -- | Constraint for non-zero natural number which can be a radix.
@@ -93,6 +92,12 @@ class Padic n where
   --
   -- prop> splitUnit (u * p^v) = (u, v)
   splitUnit :: n -> (Unit n, Int)
+ 
+  -- | Returns @True@ for a p-adic number which is multiplicatively invertible.
+  isInvertible :: n -> Bool
+
+  -- | Partial multiplicative inverse of p-adic number (defined both for integer or rational p-adics).
+  inverse :: n -> Maybe n
   
 
 -- | The least significant digit of a p-adic number.
@@ -141,20 +146,6 @@ norm n = (radix n % 1) ^^ (-valuation n)
 -- | Returns @True@ for a p-adic number which is equal to zero (within it's precision).
 isZero :: Padic n => n -> Bool
 isZero n = valuation n >= precision n
-
--- | Returns @True@ for a p-adic number which is multiplicatively invertible.
-isInvertible :: Padic n => n -> Bool
-isInvertible n = (lifted n `mod` p) `gcd` p == 1
-  where
-    p = radix n
-  
--- | Partial multiplicative inverse of p-adic number (defined both for integer or rational p-adics).
-inverse :: Padic n => n -> Maybe n
-inverse n
-  | isInvertible n = Just (mkUnit $ recipModInteger (lifted n) pk)
-  | otherwise = Nothing
-  where
-    pk = liftedMod n
 
 liftedMod :: (Padic n, Integral a) => n -> a
 liftedMod n = radix n ^ (2*precision n + 1)

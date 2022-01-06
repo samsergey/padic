@@ -13,7 +13,6 @@ module Main where
 
 import Math.NumberTheory.Padic
 import Math.NumberTheory.Padic.Classes
-import Math.NumberTheory.Padic.Integer
 import Math.NumberTheory.Padic.Rational
 import GHC.TypeLits hiding (Mod)
 import GHC.Prim (coerce)
@@ -99,6 +98,7 @@ equivTest = testGroup "Equivalence tests"
   ]
 
 ------------------------------------------------------------
+{-
 cycleTest :: TestTree
 cycleTest = testGroup "findCycle tests"
   [ testCase "1" $ findCycle 10 [1..5] @?= Nothing
@@ -114,7 +114,7 @@ cycleTest = testGroup "findCycle tests"
   , testCase "11" $ findCycle 10 ([0,2,3] ++ cycle [1,2,3]) @?= Just ([0],[2,3,1])
   , testCase "12" $ findCycle 200 ([1..99] ++ cycle [100..200]) @?= Just ([1..99],[100..200])
   ]
-
+-}
 ------------------------------------------------------------
 
 ------------------------------------------------------------

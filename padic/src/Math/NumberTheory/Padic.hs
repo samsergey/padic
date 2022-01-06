@@ -48,15 +48,9 @@ Negative p-adic integers and rational p-adics have trailing periodic digit seque
 In order to gain efficiency the integer p-adic number with radix \(p\) is internally
 represented as only one digit /lifted/ to modulo \(p^k\), where \(k\) is
 chosen so that within working precision integers and rationals could be
-reconstructed.
-
-prop> k = 2*precision n + 1
+reconstructed by by extended Euclidean method.
 
 Sequence of digits modulo \(p\) are used only for textual representation and may be obtained by 'digits' function. 
-
-Rational reconstruction is done using a method from Paul S. Wang.
-For a truncated p-adic number \(x = \frac{r}{s}\) the equation
-\( x \cdot s \equiv r\ (\mathrm{mod}\ p^k)\) is solved by extended Euclidean method.
 -}
 ------------------------------------------------------------
 module Math.NumberTheory.Padic
@@ -157,7 +151,8 @@ henselLifting f f' = res
 >>> findSolutionMod (\x -> x*x - x) :: [Q 10]
 [0.0,1.0,5.0,6.0]
 -}
-findSolutionMod :: (Padic n, Radix p, Digit n ~ Mod p) => (n -> n) -> [n]
+findSolutionMod :: (Padic n, Radix p, Digit n ~ Mod p)
+                => (n -> n) -> [n]
 findSolutionMod f = [ fromMod d | d <- [0..], fm d == 0 ]
   where
     fm = toMod . f . fromMod

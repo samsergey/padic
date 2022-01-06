@@ -50,7 +50,7 @@ instance (Radix p, KnownNat prec) => Show (Q' p prec) where
 
 instance (Radix p, KnownNat prec) => Padic (Q' p prec) where
   type Unit (Q' p prec) = Z' p prec
-  type Digit (Q' p prec) = Mod p 
+  type Digit (Q' p prec) = Digit (Z' p prec)
 
   precision = fromIntegral . natVal
 
@@ -68,6 +68,11 @@ instance (Radix p, KnownNat prec) => Padic (Q' p prec) where
 
   splitUnit (Q' (u, v)) = (u, v)
   
+  isInvertible = isInvertible . unit . normalize
+  
+  inverse n = do r <- inverse (unit n)
+                 return $ fromUnit (r, - valuation n)
+
 
 {- | Adjusts unit and valuation of p-adic number, by removing trailing zeros from the right-side of the unit.
 

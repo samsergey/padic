@@ -8,14 +8,16 @@
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE UnliftedFFITypes #-}
 
-module Math.NumberTheory.Padic.Integer where
+module Math.NumberTheory.Padic.IntegerBN where
 
 import Data.List
 import Data.Mod
 import Data.Ratio
 import Data.Maybe (listToMaybe)
 import GHC.TypeLits hiding (Mod)
-import GHC.Integer.GMP.Internals (recipModInteger)
+import GHC.Integer.GMP.Internals
+import GHC.Natural
+import GHC.Prim (int2Word#)
 
 import Math.NumberTheory.Padic.Classes
 
@@ -25,12 +27,11 @@ import Math.NumberTheory.Padic.Classes
 type Z p = Z' p 20
 
 -- |  Integer p-adic number with explicitly specified precision.
-newtype Z' (p :: Nat) (prec :: Nat) = Z' (Z_ p)
+newtype Z' (p :: Nat) (prec :: Nat) = Z' (Z# p)
 
-newtype Z_ (p :: Nat) = Z_ Integer
+newtype Z# (p :: Nat) = Z# BigNat
 
 instance (Radix p, KnownNat prec) => Show (Z' p prec) where
-  show 0 = "0"
   show n  
     | length ds > pr = ell ++ toString (take pr ds)
     | otherwise = toString (take pr ds)
@@ -46,51 +47,63 @@ instance (Radix p, KnownNat prec) => Show (Z' p prec) where
 
 instance (Radix p, KnownNat prec) => Padic (Z' p prec) where
   type Unit (Z' p prec) = Z' p prec
-  
+  type Lifted (Z' p prec) = BigNat
   type Digit (Z' p prec) = Mod p 
 
   precision = fromIntegral . natVal
 
-  fromDigits = mkUnit . fromRadix
+  fromDigits = mkUnit . fromRadix#
 
-  digits n = toRadix (lifted n)
+  digits n = toRadix# (lifted n)
 
   radix (Z' n) = fromIntegral $ natVal n
 
-  lifted (Z' (Z_ n)) = n
+  lifted (Z' (Z# n)) = n
 
-  mkUnit = Z' . Z_
+  mkUnit = Z' . Z#
 
-  fromUnit (u, v) = mkUnit $ radix u ^ fromIntegral v * lifted u
+  fromUnit (u, v) = mkUnit $ (radix# u `powBigNat` v) `timesBigNat` lifted u
 
-  splitUnit n = case getUnitZ (radix n) (lifted n) of
-                  (0, 0) -> (0, precision n)
-                  (u, v) -> (mkUnit u, v)
-  
-  isInvertible n = (lifted n `mod` p) `gcd` p == 1
+  splitUnit n = case getUnit# (radix# n) (lifted n) of
+                  (u, v)
+                    | isZeroBigNat u -> (mkUnit zeroBigNat, precision n)
+                    | otherwise -> (mkUnit u, v)
+
+  isInvertible n = (lifted n `remBigNat` p) `gcdBigNat` p == oneBigNat
     where
-      p = radix n
+      p = radix# n
   
   inverse n
-    | isInvertible n = Just (mkUnit $ recipModInteger (lifted n) pk)
+    | isInvertible n = Just (mkUnit $ recipModBigNat (lifted n) pk)
     | otherwise = Nothing
     where
-      pk = liftedMod n
+      pk = liftedMod# n
 
+powBigNat :: BigNat -> Int -> BigNat
+powBigNat _ 0 = oneBigNat
+powBigNat n 1 = n
+powBigNat n 2 = sqrBigNat n
+powBigNat n k | odd k = n `timesBigNat` powBigNat n (k - 1)
+              | otherwise = powBigNat (sqrBigNat n) (k `div` 2) 
+
+liftedMod# n = radix# n `powBigNat` (2*precision n + 1)
 
 instance (Radix p, KnownNat prec) => Eq (Z' p prec) where
-  x@(Z' (Z_ a)) == (Z' (Z_ b)) = a `mod` pk == b `mod` pk
+  x@(Z' (Z# a)) == (Z' (Z# b)) = a `remBigNat` pk == b `remBigNat` pk
     where
-      pk = radix x ^ precision x
+      pk = radix# x `powBigNat` precision x
 
 instance (Radix p, KnownNat prec) => Num (Z' p prec) where
   fromInteger n = res
     where
-      res = mkUnit $ fromInteger n `mod` liftedMod res
+      res = case n of
+        S# i# -> mkUnit $ wordToBigNat (int2Word# i#) `remBigNat` liftedMod# res
+        Jp# x# -> mkUnit $ x# `remBigNat` liftedMod# res
+        Jn# x# -> negate $ mkUnit $ x# `remBigNat` liftedMod# res
       
-  a + b = mkUnit $ (lifted a + lifted b) `mod` liftedMod a
-  a * b = mkUnit $ (lifted a * lifted b) `mod` liftedMod a 
-  negate a = mkUnit $ liftedMod a - lifted a
+  x@(Z' (Z# a)) + Z' (Z# b) = mkUnit $ (a `plusBigNat` b) `remBigNat` liftedMod# x
+  x@(Z' (Z# a)) * Z' (Z# b) = mkUnit $ (a `timesBigNat` b) `remBigNat` liftedMod# x 
+  negate x@(Z' (Z# a)) = mkUnit $ liftedMod# x `minusBigNat` (a `remBigNat` liftedMod# x)
   abs = id
   signum _ = 1
 
@@ -98,24 +111,34 @@ instance (Radix p, KnownNat prec) => Enum (Z' p prec) where
   toEnum = fromIntegral
   fromEnum = fromIntegral . toInteger
 
+
 instance (Radix p, KnownNat prec) => Real (Z' p prec) where
   toRational 0 = 0
-  toRational n = extEuclid (lifted n, liftedMod n)
+  toRational n = extEuclid (bigNatToInteger (lifted n), liftedMod n)
+
+extEuclid :: Integral i => (Integer, Integer) -> Ratio i
+extEuclid (n, m) = go (m, 0) (n, 1)
+  where
+    go (v1, v2) (w1, w2)
+      | 2*w1*w1 > abs m =
+        let q = v1 `div` w1
+         in go (w1, w2) (v1 - q * w1, v2 - q * w2)
+      | otherwise = fromRational (w1 % w2)
+
 
 instance (Radix p, KnownNat prec) => Integral (Z' p prec) where
   toInteger n = if denominator r == 1
                 then numerator r
-                else lifted n `mod` (radix n ^ precision n)
+                else bigNatToInteger (lifted n) `mod` (radix n ^ precision n)
     where
       r = toRational n
   a `quotRem` b = case inverse b of
     Nothing -> error "not divisible!" 
     Just r -> let q = a*r in (q, a - q * b)
 
-
 instance (Radix p, KnownNat prec) => Ord (Z' p prec) where
   compare = error "ordering is not defined for Z"
-
+{-
 ------------------------------------------------------------
 ------------------------------------------------------------
 
@@ -153,14 +176,8 @@ findCycle len lst =
       | and $ zipWith (==) (take (2*len) lst) (pref ++ cycle c) = Just (pref, c)
       | otherwise = Nothing
 
-extEuclid :: Integral i => (Integer, Integer) -> Ratio i
-extEuclid (n, m) = go (m, 0) (n, 1)
-  where
-    go (v1, v2) (w1, w2)
-      | 2*w1*w1 > abs m =
-        let q = v1 `div` w1
-         in go (w1, w2) (v1 - q * w1, v2 - q * w2)
-      | otherwise = fromRational (w1 % w2)
+
+-}
 
 -- | Extracts p-adic unit from integer number. For radix \(p\) and integer \(n\) returns
 -- pair \((u, k)\) such that \(n = u \cdot p^k\).
@@ -173,28 +190,34 @@ extEuclid (n, m) = go (m, 0) (n, 1)
 -- (2,3 % 157)
 -- >>> getUnitQ 157 (75/157)
 -- (-1,75 % 1)
-getUnitZ :: Integer -> Integer -> (Integer, Int)
-getUnitZ _ 0 = (0, 0)
-getUnitZ p x = (b, length v)
+getUnit# :: BigNat -> BigNat -> (BigNat, Int)
+getUnit# p x
+  | isZeroBigNat x = (zeroBigNat, 0)
+  | otherwise = (b, length v)
   where
-    (v, b:_) = span (\n -> n `mod` p == 0) $ iterate (`div` p) x
+    (v, b:_) = span (\n -> isZeroBigNat (n `remBigNat` p)) $ iterate (`quotBigNat` p) x
+
+fromRadix# :: Radix p => [Mod p] -> BigNat
+fromRadix# ds = foldr go zeroBigNat ds
+  where
+    p# = case fromIntegral $ natVal $ head $ 0 : ds of
+      NatJ# x -> x
+      NatS# x -> wordToBigNat x
+    go x r# = let n# = case unMod x of
+                         NatJ# y -> y
+                         NatS# y -> wordToBigNat y
+              in n# `plusBigNat` (r# `timesBigNat` p#)
 
 
--- | Unfolds a number to a list of digits (integers modulo @p@).  
-toRadix :: (Integral i, Radix p) => i -> [Mod p]
-toRadix 0 = [0]
-toRadix n = res
+toRadix# :: Radix p => BigNat -> [Mod p]
+toRadix# n = res
   where
     res = unfoldr go n
-    p = fromIntegral $ natVal $ head $ 0 : res
-    go 0 = Nothing
-    go x =
-      let (q, r) = quotRem x p
-       in Just (fromIntegral r, q)
-  
--- | Folds a list of digits (integers modulo @p@) to a number.
-fromRadix :: (Integral i, Radix p) => [Mod p] -> i
-fromRadix ds = foldr (\x r -> fromIntegral (unMod x) + r * p) 0 ds
-  where
-    p = fromIntegral $ natVal $ head $ 0 : ds
+    p# = radix# (head (0 : res))
+    go x | isZeroBigNat x = Nothing
+         | otherwise = let (# q, r #) = quotRemBigNat x p#
+                       in Just (fromIntegral (NatJ# r), q)
 
+radix# n = case fromIntegral (natVal n) of
+      NatJ# x -> x
+      NatS# x -> wordToBigNat x
