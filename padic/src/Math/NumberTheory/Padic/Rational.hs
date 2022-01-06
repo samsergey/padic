@@ -52,18 +52,25 @@ instance LiftedRadix p prec => Padic (Q' p prec) where
   type Unit (Q' p prec) = Z' p prec
   type Digit (Q' p prec) = Digit (Z' p prec)
 
+  {-# INLINE precision #-}
   precision = fromIntegral . natVal
 
+  {-# INLINE  radix #-}
   radix (Q' (u, _)) = radix u
 
+  {-# INLINE digits #-}
   digits (Q' (u, v)) = replicate v 0 ++ toRadix (lifted u)
 
-  fromDigits ds = normalize $ Q' (fromDigits ds, 0)
+  {-# INLINE fromDigits #-}
+  fromDigits ds = normalize $! Q' (fromDigits ds, 0)
 
+  {-# INLINE lifted #-}
   lifted (Q' (u, _)) = lifted u
 
-  mkUnit ds = normalize $ Q' (mkUnit ds, 0)
+  {-# INLINE mkUnit #-}
+  mkUnit ds = normalize $! Q' (mkUnit ds, 0)
 
+  {-# INLINE fromUnit #-}
   fromUnit = Q'
 
   splitUnit (Q' (u, v)) = (u, v)
@@ -113,15 +120,18 @@ instance LiftedRadix p prec => Ord (Q' p prec) where
   compare = error "Order is nor defined for p-adics."
 
 instance LiftedRadix p prec => Num (Q' p prec) where
-  fromInteger n = normalize $ Q' (fromInteger n, 0)
+  fromInteger n = normalize $! Q' (fromInteger n, 0)
           
-  a + b = Q' (p ^ (va - v) * unit a + p ^ (vb - v) * unit b, v)
+  x@(Q' (Z' (Z_ a), va)) + Q' (Z' (Z_ b), vb) =
+    normalize $ case compare va vb of
+      LT -> Q' (Z' (Z_ $! a + p ^ (vb - va) * b), va)
+      EQ -> Q' (Z' (Z_ $! a + b), va)
+      GT -> Q' (Z' (Z_ $! p ^ (va - vb) * a + b), vb)
     where
-      va = valuation a
-      vb = valuation b
-      v = va `min` vb
-      p = radix a
-  a * b = Q' (unit a * unit b, valuation a + valuation b)
+      p = fromInteger (radix x)
+      
+  Q' (Z' (Z_ a), va) * Q' (Z' (Z_ b), vb) = normalize $ Q' (Z' (Z_ $! a * b), va + vb)
+      
   negate (Q' (u, v)) = Q' (negate u, v)
   abs = id
   signum 0 = 0

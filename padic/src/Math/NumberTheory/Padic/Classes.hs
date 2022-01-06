@@ -101,6 +101,7 @@ class Padic n where
   
 
 -- | The least significant digit of a p-adic number.
+{-# INLINE firstDigit #-}
 firstDigit n = head (digits n)
 
 -- | returns the unit of a number
@@ -112,6 +113,7 @@ firstDigit n = head (digits n)
 -- >>> unit (75 :: Z 5)
 -- 3
 unit :: Padic n => n -> Unit n
+{-# INLINE unit #-}
 unit = fst . splitUnit
 
 -- | returns a valuation  of a number
@@ -130,6 +132,7 @@ unit = fst . splitUnit
 -- >>> valuation (0 :: Q' 2 150)
 -- 150
 valuation :: Padic n => n -> Int
+{-# INLINE valuation #-}
 valuation = snd . splitUnit
 
 -- | returns a rational norm of a number
@@ -141,12 +144,15 @@ valuation = snd . splitUnit
 -- >>> norm (75 :: Z 5)
 -- 4.0e-2
 norm :: (Integral i, Padic n) => n -> Ratio i
+{-# INLINE norm #-}
 norm n = (radix n % 1) ^^ (-valuation n)
 
 -- | Returns @True@ for a p-adic number which is equal to zero (within it's precision).
 isZero :: Padic n => n -> Bool
+{-# INLINE isZero #-}
 isZero n = valuation n >= precision n
 
 liftedMod :: (Padic n, Integral a) => n -> a
+{-# INLINE liftedMod #-}
 liftedMod n = radix n ^ (2*precision n + 1)
 

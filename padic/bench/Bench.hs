@@ -33,9 +33,9 @@ divMaybe a b | isInvertible b = Just (a `div` b)
 fracMaybe a b | isInvertible b = Just (a / b)
               | otherwise = Nothing
 
-data M a = I | M [[a]]
+data M a = I | M ![[a]]
 
-dot a b = sum $ zipWith (*) a b                 
+dot a b = sum $! zipWith (*) a b                 
 
 instance Num a => Semigroup (M a) where
   I <> x = x
@@ -49,25 +49,29 @@ suite :: [Benchmark]
 suite =
   [ bgroup
       "add"
-      [ bench "Integer" $ whnf (addBench (0 :: Integer)) 200
-      , bench "Mod 2^20" $ whnf (addBench (0 :: Mod 1048576)) 200
-      , bench "Z 2" $ whnf (addBench (0 :: Z' 2 20)) 200
-      , bench "Z 13" $ whnf (addBench (0 :: Z' 13 20)) 200
-      , bench "Z 251" $ whnf (addBench (0 :: Z' 251 20)) 200
-      , bench "Q 2" $ whnf (addBench (0 :: Q' 2 20)) 200
-      , bench "Q 13" $ whnf (addBench (0 :: Q' 13 20)) 200
-      , bench "Q 251" $ whnf (addBench (0 :: Q' 251 20)) 200]
+      [ bench "Integer" $ whnf (addBench (0 :: Integer)) 1000
+      , bench "Mod 2^20" $ whnf (addBench (0 :: Mod 2199023255552)) 1000
+      , bench "Z 2" $ whnf (addBench (0 :: Z' 2 20)) 1000
+      , bench "Z 2 100" $ whnf (addBench (0 :: Z' 2 1000)) 1000
+      , bench "Z 13" $ whnf (addBench (0 :: Z' 13 20)) 1000
+      , bench "Z 251" $ whnf (addBench (0 :: Z' 251 20)) 1000
+      , bench "Q 2" $ whnf (addBench (0 :: Q' 2 20)) 1000
+      , bench "Q 2 100" $ whnf (addBench (0 :: Q' 2 100)) 1000
+      , bench "Q 13" $ whnf (addBench (0 :: Q' 13 20)) 1000
+      , bench "Q 251" $ whnf (addBench (0 :: Q' 251 20)) 1000]
   , bgroup
       "mul"
-      [ bench "Integer" $ whnf (mulBench (0 :: Integer)) 200
-      , bench "Mod 2^20" $ whnf (mulBench (0 :: Mod 1048576)) 200
-      , bench "Z 2" $ whnf (mulBench (0 :: Z' 2 20)) 200
-      , bench "Z 13" $ whnf (mulBench (0 :: Z' 13 20)) 200
-      , bench "Z 251" $ whnf (mulBench (0 :: Z' 251 20)) 200
-      , bench "Q 2" $ whnf (mulBench (0 :: Q' 2 20)) 200
-      , bench "Q 13" $ whnf (mulBench (0 :: Q' 13 20)) 200
-      , bench "Q 251" $ whnf (mulBench (0 :: Q' 251 20)) 200]
-{-  , bgroup
+      [ bench "Integer" $ whnf (mulBench (0 :: Integer)) 1000
+      , bench "Mod 2^20" $ whnf (mulBench (0 :: Mod 2199023255552)) 1000
+      , bench "Z 2" $ whnf (mulBench (0 :: Z' 2 20)) 1000
+      , bench "Z 2 100" $ whnf (mulBench (0 :: Z' 2 100)) 1000
+      , bench "Z 13" $ whnf (mulBench (0 :: Z' 13 20)) 1000
+      , bench "Z 251" $ whnf (mulBench (0 :: Z' 251 20)) 1000
+      , bench "Q 2" $ whnf (mulBench (0 :: Q' 2 20)) 1000
+      , bench "Q 2 100" $ whnf (mulBench (0 :: Q' 2 100)) 1000
+      , bench "Q 13" $ whnf (mulBench (0 :: Q' 13 20)) 1000
+      , bench "Q 251" $ whnf (mulBench (0 :: Q' 251 20)) 1000]
+  , bgroup
       "div"
       [ bench "Double" $ whnf (divBench (13 / 5) (4 / 3 :: Double)) 200
       , bench "Z 2" $ whnf (divBench (13 `div` 5) (4 `div` 3 :: Z 2)) 200
@@ -76,7 +80,7 @@ suite =
       , bench "Q 2" $ whnf (divBench (13 / 4) (4 / 3 :: Q 2)) 200
       , bench "Q 13" $ whnf (divBench (13 / 4) (4 / 3 :: Q 13)) 200
       , bench "Q 251" $ whnf (divBench (13 / 4) (4 / 3 :: Q 251)) 200
-      ]-}
+      ]
   ]
 
 main :: IO ()

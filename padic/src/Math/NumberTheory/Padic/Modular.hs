@@ -42,12 +42,15 @@ type Z p = Z' p 20
 newtype Z' (p :: Nat) (prec :: Nat) = Z' (Z_ prec p)
 
 deriving via Z_ prec p instance (LiftedRadix p prec) => Num (Z' p prec)
-deriving via Z_ prec p instance (LiftedRadix p prec) => Eq (Z' p prec)
 
 newtype Z_ (prec :: Nat ) (p :: Nat) = Z_ (Mod (Lifted p prec))
 
 deriving via Mod (Lifted p prec) instance (LiftedRadix p prec) => Num (Z_ prec p)
-deriving via Mod (Lifted p prec) instance (LiftedRadix p prec) => Eq (Z_ prec p)
+
+instance LiftedRadix p prec => Eq (Z' p prec) where
+  x@(Z' (Z_ a)) == Z' (Z_ b) = unMod a `mod` pk == unMod b `mod` pk
+    where
+      pk = radix x ^ precision x
 
 instance LiftedRadix p prec => Show (Z' p prec) where
   show 0 = "0"
@@ -69,18 +72,25 @@ instance LiftedRadix p prec => Padic (Z' p prec) where
   
   type Digit (Z' p prec) = Mod p 
 
+  {-# INLINE precision #-}
   precision = fromIntegral . natVal
 
+  {-# INLINE  radix #-}
   radix (Z' n) = fromIntegral $ natVal n
   
+  {-# INLINE fromDigits #-}
   fromDigits = mkUnit . fromRadix
 
+  {-# INLINE digits #-}
   digits n = toRadix (lifted n)
 
+  {-# INLINE lifted #-}
   lifted (Z' (Z_ n)) = fromIntegral $ unMod n
 
+  {-# INLINE mkUnit #-}
   mkUnit = Z' . Z_ . fromInteger
 
+  {-# INLINE fromUnit #-}
   fromUnit (u, v) = mkUnit $ radix u ^ fromIntegral v * lifted u
 
   splitUnit n = case getUnitZ (radix n) (lifted n) of
@@ -91,11 +101,7 @@ instance LiftedRadix p prec => Padic (Z' p prec) where
     where
       p = radix n
   
-  inverse n
-    | isInvertible n = Just (mkUnit $ recipModInteger (lifted n) pk)
-    | otherwise = Nothing
-    where
-      pk = liftedMod n
+  inverse (Z' (Z_ n))  = Z' . Z_ <$> invertMod n
 
 instance LiftedRadix p prec  => Enum (Z' p prec) where
   toEnum = fromIntegral
