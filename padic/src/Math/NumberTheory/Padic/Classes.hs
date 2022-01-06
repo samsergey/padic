@@ -48,7 +48,16 @@ class Padic n where
   -- >>> precision (123 :: Z' 2 40)
   -- 40
   precision :: Integral i => n -> i
-
+  -- | Returns the radix of a number
+  --
+  -- Examples:
+  --
+  -- >>> radix (5 :: Z 13)
+  -- 13
+  -- >>> radix (-5 :: Q' 3 40)
+  -- 3
+  radix :: Integral i => n -> i
+ 
   -- | Constructor for a digital object from it's digits
   fromDigits :: [Digit n] -> n
   -- | Returns digits of a digital object
@@ -62,16 +71,7 @@ class Padic n where
   -- >>> take 5 $ digits (1/200 :: Q 10)
   -- [(1 `modulo` 2),(0 `modulo` 2),(1 `modulo` 2),(0 `modulo` 2),(0 `modulo` 2)]
   digits :: n -> [Digit n]
-  -- | Returns the radix of a number
-  --
-  -- Examples:
-  --
-  -- >>> radix (5 :: Z 13)
-  -- 13
-  -- >>> radix (-5 :: Q' 3 40)
-  -- 3
-  radix :: Integral i => n -> i
-  -- | Returns lifted digits
+ -- | Returns lifted digits
   --
   -- Examples:
   --
