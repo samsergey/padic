@@ -59,6 +59,7 @@ module Math.NumberTheory.Padic
   -- ** Type synonyms and constraints
     ValidRadix
   , Radix
+  , LiftedRadix
   -- ** p-adic numbers
   , Padic
   , Unit
@@ -101,7 +102,7 @@ import GHC.Integer.Logarithms (integerLogBase#)
 import GHC.Integer (smallInteger)
 import GHC.TypeLits hiding (Mod)
 import Math.NumberTheory.Padic.Classes
-import Math.NumberTheory.Padic.Integer
+import Math.NumberTheory.Padic.Modular
 import Math.NumberTheory.Padic.Rational
 
 

@@ -14,7 +14,7 @@ import Data.Ratio
 import Data.Mod
 import GHC.TypeLits hiding (Mod)
 import Math.NumberTheory.Padic.Classes
-import Math.NumberTheory.Padic.Integer
+import Math.NumberTheory.Padic.Modular
 
 ------------------------------------------------------------
 
@@ -24,7 +24,7 @@ type Q p = Q' p 20
 -- |  Rational p-adic number with explicitly specified precision.
 newtype Q' (p :: Nat) (prec :: Nat) = Q' (Z' p prec, Int)
 
-instance (Radix p, KnownNat prec) => Show (Q' p prec) where
+instance LiftedRadix p prec => Show (Q' p prec) where
   show n = si ++ sep ++ "." ++ sep ++ sf
     where
       pr = precision n
@@ -48,7 +48,7 @@ instance (Radix p, KnownNat prec) => Show (Q' p prec) where
         | radix n < 11 = ""
         | otherwise = " "
 
-instance (Radix p, KnownNat prec) => Padic (Q' p prec) where
+instance LiftedRadix p prec => Padic (Q' p prec) where
   type Unit (Q' p prec) = Z' p prec
   type Digit (Q' p prec) = Digit (Z' p prec)
 
@@ -85,7 +85,7 @@ Examples:
 (3700,0)
 >>> splitUnit (normalize x)
 (37,2) -}
-normalize :: (Radix p, KnownNat prec) => Q' p prec -> Q' p prec
+normalize :: LiftedRadix p prec => Q' p prec -> Q' p prec
 normalize n@(Q' (0, _)) = Q' (0, precision n)
 normalize n@(Q' (u, v)) = go (lifted u) v
   where
@@ -101,7 +101,7 @@ normalize n@(Q' (u, v)) = go (lifted u) v
     pr = precision n
     zero = Q' (0, pr)
 
-instance (Radix p, KnownNat prec) => Eq (Q' p prec) where
+instance LiftedRadix p prec => Eq (Q' p prec) where
   a' == b' =
     (isZero a && isZero b)
     || (valuation a == valuation b && unit a == unit b)
@@ -109,10 +109,10 @@ instance (Radix p, KnownNat prec) => Eq (Q' p prec) where
       a = normalize a'
       b = normalize b'
 
-instance (Radix p, KnownNat prec) => Ord (Q' p prec) where
+instance LiftedRadix p prec => Ord (Q' p prec) where
   compare = error "Order is nor defined for p-adics."
 
-instance (Radix p, KnownNat prec) => Num (Q' p prec) where
+instance LiftedRadix p prec => Num (Q' p prec) where
   fromInteger n = normalize $ Q' (fromInteger n, 0)
           
   a + b = Q' (p ^ (va - v) * unit a + p ^ (vb - v) * unit b, v)
@@ -127,7 +127,7 @@ instance (Radix p, KnownNat prec) => Num (Q' p prec) where
   signum 0 = 0
   signum _ = 1
 
-instance (Radix p, KnownNat prec) => Fractional (Q' p prec) where
+instance LiftedRadix p prec => Fractional (Q' p prec) where
   fromRational 0 = 0
   fromRational x = res
     where
@@ -143,7 +143,7 @@ instance (Radix p, KnownNat prec) => Fractional (Q' p prec) where
         | otherwise = 
           error $ show b' ++ " is indivisible in " ++ show (radix a) ++ "-adics!"
 
-instance (Radix p, KnownNat prec) => Real (Q' p prec) where
+instance LiftedRadix p prec => Real (Q' p prec) where
   toRational n = toRational (unit n) / norm n
 
 ------------------------------------------------------------
