@@ -200,17 +200,11 @@ instance LiftedRadix p prec => Ord (Z' p prec) where
 -- Uses the modified tortiose and hare method.
 findCycle :: Eq a => Int -> [a] -> Maybe ([a], [a])
 findCycle len lst =
-  case tortoiseHare rest of
-    Just (a, c) -> test $ clean $ rollback (pref ++ a, c)
-    Nothing -> Nothing
+  find test [ rollback (a, c)
+            | (a, cs) <- tortoiseHare len lst
+            , c <- take 1 [ c | c <- tail (inits cs)
+                              , and $ zipWith (==) cs (cycle c) ] ]
   where
-    (pref, rest) = splitAt len lst
-    tortoiseHare x =
-      fmap (fmap fst) . listToMaybe $
-      dropWhile (\(_, (a, b)) -> notCycle a b) $
-      zip (inits x) $
-      zipWith splitAt [1 .. len] $ zipWith take [4,8 ..] $ tails x
-    notCycle a b = not (concat (replicate 3 a) == b)
     rollback (as, bs) = go (reverse as, reverse bs)
       where
         go =
@@ -219,15 +213,13 @@ findCycle len lst =
             (x:xs, y:ys)
               | x == y -> go (xs, ys ++ [x])
             (xs, ys) -> (reverse xs, reverse ys)
-    clean =
-      \case
-        (x, c:cs)
-          | length x + length cs > len -> (take len (x ++ c : cs), [])
-          | all (c ==) cs -> (x, [c])
-        other -> other
-    test (_, []) = Nothing 
-    test (pref, c)
-      | and $ zipWith (==) (take (2*len) lst) (pref ++ cycle c) = Just (pref, c)
-      | otherwise = Nothing
+    test (_, []) = False
+    test (pref, c) = and $ zipWith (==) (take len lst) (pref ++ cycle c)
 
- 
+tortoiseHare :: Eq a => Int -> [a] -> [([a], [a])]
+tortoiseHare l x =
+  map (fmap fst) $
+  filter (\(_, (a, b)) -> concat (replicate 3 a) == b) $
+  zip (inits x) $
+  zipWith splitAt [1 .. l] $ zipWith take [4, 8 ..] $ tails x
+

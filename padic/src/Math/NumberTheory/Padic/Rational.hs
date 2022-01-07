@@ -38,9 +38,8 @@ instance LiftedRadix p prec => Show (Q' p prec) where
       sf = intercalate sep $ showD <$> reverse f
       si =
         case findCycle pr i of
-          Nothing -> ell ++ toString i
+          Nothing -> ell ++ toString (take pr i)
           Just ([], [0]) -> "0"
-          Just (pref, []) -> ell ++ toString pref
           Just (pref, [0]) -> toString pref
           Just (pref, cyc)
             | length pref + length cyc <= pr ->
