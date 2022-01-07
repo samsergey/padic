@@ -10,8 +10,8 @@
 {-# LANGUAGE MagicHash #-}
 
 {- |
-Module      : Math.NumberTheory.Padic
-Description : Representation a nd simple algebra for p-adic numbers.
+Module      : Math.NumberTheory.Padic.Fixed
+Description : Representation a nd simple algebra for p-adic numbers with fixed precision.
 Copyright   : (c) Sergey Samoylenko, 2022
 License     : GPL-3
 Maintainer  : samsergey@yandex.ru
@@ -53,17 +53,18 @@ reconstructed by by extended Euclidean method.
 Sequence of digits modulo \(p\) are used only for textual representation and may be obtained by 'digits' function. 
 -}
 ------------------------------------------------------------
-module Math.NumberTheory.Padic
+module Math.NumberTheory.Padic.Fixed
   ( 
   -- * Classes and functions
   -- ** Type synonyms and constraints
     ValidRadix
   , Radix
+  , LiftedRadix
   -- ** p-adic numbers
   , Padic
   , Unit
-  , Digit
   , LiftedDigits
+  , Digit
   , radix
   , precision
   , digits
@@ -91,8 +92,8 @@ module Math.NumberTheory.Padic
   , fromRadix
   , toRadix
   , sufficientPrecision
---  , findSolutionMod
---  , henselLifting
+  , findSolutionMod
+  , henselLifting
   ) where
 
 import Data.Maybe
@@ -102,8 +103,8 @@ import GHC.Integer.Logarithms (integerLogBase#)
 import GHC.Integer (smallInteger)
 import GHC.TypeLits hiding (Mod)
 import Math.NumberTheory.Padic.Classes
-import Math.NumberTheory.Padic.Integer
-import Math.NumberTheory.Padic.Rational
+import Math.NumberTheory.Padic.Fixed.Integer
+import Math.NumberTheory.Padic.Fixed.Rational
 
 
 ------------------------------------------------------------
@@ -121,7 +122,7 @@ Examples:
 -}
 sufficientPrecision :: (Integral a) => Integer -> a -> Integer
 sufficientPrecision p m = smallInteger (integerLogBase# p (2 * fromIntegral m)) + 1
-{-
+
   
 {- | Returns p-adic solution of the equation \(f(x) = 0\) by Hensel lifting solutions of \(f(x) = 0\ \mathrm{mod}\ p\).
 
@@ -133,7 +134,7 @@ Examples:
 [0,1,…92256259918212890625,…07743740081787109376]
 -}
 henselLifting ::
-     (Eq n, Num n, Padic n, Radix p, Digit n ~ Mod p)
+     (Eq n, Num n, Padic n, Radix p, Digit n ~ Mod p, LiftedDigits n ~ Integer)
   => (n -> n) -- ^ Function to be vanished.
   -> (n -> n) -- ^ Derivative of the function.
   -> [n] -- ^ The result.
@@ -152,7 +153,7 @@ henselLifting f f' = res
 >>> findSolutionMod (\x -> x*x - x) :: [Q 10]
 [0.0,1.0,5.0,6.0]
 -}
-findSolutionMod :: (Padic n, Radix p, Digit n ~ Mod p)
+findSolutionMod :: (Padic n, Radix p, Digit n ~ Mod p, LiftedDigits n ~ Integer)
                 => (n -> n) -> [n]
 findSolutionMod f = [ fromMod d | d <- [0..], fm d == 0 ]
   where
@@ -169,4 +170,3 @@ iterateM n f = go n
       if x == y then pure x else go (i - 1) y
     
 fib a b = a : fib b (a + b)
--}

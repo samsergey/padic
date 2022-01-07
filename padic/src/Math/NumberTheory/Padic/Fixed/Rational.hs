@@ -7,14 +7,14 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module Math.NumberTheory.Padic.Rational where
+module Math.NumberTheory.Padic.Fixed.Rational where
 
 import Data.List (intercalate)
 import Data.Ratio
 import Data.Mod
 import GHC.TypeLits hiding (Mod)
 import Math.NumberTheory.Padic.Classes
-import Math.NumberTheory.Padic.Integer
+import Math.NumberTheory.Padic.Fixed.Integer
 
 ------------------------------------------------------------
 
@@ -27,37 +27,30 @@ newtype Q' (p :: Nat) (prec :: Nat) = Q' (Z' p prec, Int)
 instance LiftedRadix p prec => Show (Q' p prec) where
   show n = si ++ sep ++ "." ++ sep ++ sf
     where
-      k = valuation n
       pr = precision n
-      ds = digits (unit n)
+      (u, k) = splitUnit (normalize n)
+      ds = digits u
       (f, i) =
-        case compare k 0 of
+        clean <$> case compare k 0 of
           EQ -> ([0], ds)
           GT -> ([0], replicate k 0 ++ ds)
-          LT -> splitAt (-k) ds
-      sf = intercalate sep $ showD <$> reverse f
-      si =
-        case findCycle pr i of
-          Nothing -> ell ++ toString i
-          Just ([], [0]) -> "0"
-          Just (pref, []) -> ell ++ toString pref
-          Just (pref, [0]) -> toString pref
-          Just (pref, cyc)
-            | length pref + length cyc <= pr ->
-              let sp = toString pref
-                  sc = toString cyc
-               in "(" ++ sc ++ ")" ++ sep ++ sp
-            | otherwise -> ell ++ toString (take pr $ pref ++ cyc)
-      showD = show . unMod
+          LT -> splitAt (-k) (ds ++ replicate pr 0)
+      sf = toString f
+      si | length i > pr = ell ++ toString (take pr i)
+         | otherwise = toString (take pr i)
       toString = intercalate sep . map showD . reverse
+      showD = show . unMod
+      clean s = case dropWhile (== 0) (reverse s) of
+        [] -> [0]
+        x -> reverse x
       ell = "…" ++ sep
       sep
         | radix n < 11 = ""
         | otherwise = " "
-    
+
 instance LiftedRadix p prec => Padic (Q' p prec) where
   type Unit (Q' p prec) = Z' p prec
-  type LiftedDigits (Q' p prec) = LiftedDigits (Z' p prec)
+  type LiftedDigits (Q' p prec) = Integer
   type Digit (Q' p prec) = Digit (Z' p prec)
 
   {-# INLINE precision #-}
@@ -67,17 +60,18 @@ instance LiftedRadix p prec => Padic (Q' p prec) where
   radix (Q' (u, _)) = radix u
 
   {-# INLINE digits #-}
-  digits (Q' (u, v)) = replicate v 0 ++ digits u
+  digits (Q' (u, v)) = replicate v 0 ++ toRadix (lifted u)
 
   {-# INLINE fromDigits #-}
-  fromDigits ds = Q' (fromDigits ds, 0)
+  fromDigits ds = normalize $ Q' (fromDigits ds, 0)
 
   {-# INLINE lifted #-}
   lifted (Q' (u, _)) = lifted u
 
   {-# INLINE mkUnit #-}
-  mkUnit ds = Q' (Z' (Z_ ds), 0)
+  mkUnit ds = normalize $ Q' (mkUnit ds, 0)
 
+  {-# INLINE fromUnit #-}
   fromUnit = Q'
 
   splitUnit (Q' (u, v)) = (u, v)
@@ -100,27 +94,20 @@ Examples:
 >>> splitUnit (normalize x)
 (37,2) -}
 normalize :: LiftedRadix p prec => Q' p prec -> Q' p prec
---normalize 0 = 0
-normalize n = go (lifted u) v
+normalize n@(Q' (0, _)) = Q' (0, precision n)
+normalize n@(Q' (u, v)) = go (lifted u) v
   where
-    (u, v) = splitUnit n
     go _ k | k >= pr = zero
-    go (d:ds) k = case getUnitZ p (lifted d) of
-      (0, 0) -> go ds (k + ilog p (radix d))
+    go d k = case getUnitZ p d of
+      (0, 0) -> zero
       (d', k')
         | k + k' >= pr -> zero
         | otherwise ->
-          let s = fromIntegral (p^k')
-          in fromUnit (mkUnit (shiftL s (fromIntegral d':ds)), k + k')
-    p = radix n
+          let s = p ^ fromIntegral k'
+          in fromUnit (mkUnit d', k + k')
+    p = radix u
     pr = precision n
-    zero = Q' (0, precision n)
-
-shiftL :: Radix p => Mod p -> [Mod p] -> [Mod p]
-shiftL s (d1:d2:ds) =
-  let (q, r) = quotRem (lifted d2) (lifted s)
-      pk = fromIntegral (radix s `div` lifted s)
-  in d1 + fromIntegral r * pk : shiftL s (fromIntegral q : ds)
+    zero = Q' (0, pr)
 
 instance LiftedRadix p prec => Eq (Q' p prec) where
   a' == b' =
@@ -136,15 +123,15 @@ instance LiftedRadix p prec => Ord (Q' p prec) where
 instance LiftedRadix p prec => Num (Q' p prec) where
   fromInteger n = normalize $ Q' (fromInteger n, 0)
           
-  x@(Q' (a, va)) + Q' (b, vb) =
+  x@(Q' (Z' (Z_ a), va)) + Q' (Z' (Z_ b), vb) =
     case compare va vb of
-      LT -> Q' (a + p ^ (vb - va) * b, va)
-      EQ -> Q' (a + b, va)
-      GT -> Q' (p ^ (va - vb) * a + b, vb)
+      LT -> Q' (Z' (Z_ (a + p ^% (vb - va) * b)), va)
+      EQ -> Q' (Z' (Z_ (a + b)), va)
+      GT -> Q' (Z' (Z_ (p ^% (va - vb) * a + b)), vb)
     where
       p = fromInteger (radix x)
       
-  Q' (a, va) * Q' (b, vb) = Q' (a * b, va + vb)
+  Q' (Z' (Z_ a), va) * Q' (Z' (Z_ b), vb) = Q' (Z' (Z_ (a * b)), va + vb)
       
   negate (Q' (u, v)) = Q' (negate u, v)
   abs = id
@@ -158,7 +145,7 @@ instance LiftedRadix p prec => Fractional (Q' p prec) where
       res = Q' (n `div` d, v)
       p = radix res
       (q, v) = getUnitQ p x
-      (n, d) = (fromInteger $ numerator q, fromInteger $ denominator q)
+      (n, d) = (mkUnit $ numerator q, mkUnit $ denominator q)
   a / b = Q' (res, valuation a - valuation b')
     where
       b' = normalize b

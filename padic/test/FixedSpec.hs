@@ -1,4 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeApplications #-}
@@ -9,18 +11,21 @@
 
 module Main where
 
-import Math.NumberTheory.Padic
+import Math.NumberTheory.Padic.Fixed
 import Math.NumberTheory.Padic.Classes
-import Math.NumberTheory.Padic.Rational
-import Math.NumberTheory.Padic.Integer
+import Math.NumberTheory.Padic.Fixed.Rational
+import Math.NumberTheory.Padic.Fixed.Integer
 import GHC.TypeLits hiding (Mod)
+import GHC.Prim (coerce)
 import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
 import Test.Tasty.ExpectedFailure
 import Test.QuickCheck
 import Data.Mod
+import Data.Maybe
 import Data.Ratio
+import Data.Word
 
 instance Radix m => Arbitrary (Mod m) where
   arbitrary = fromInteger <$> arbitrary
@@ -59,26 +64,26 @@ instance LiftedRadix p prec => Arbitrary (Q' p prec) where
 a @/= b = assertBool "" (a /= b)
 
 ------------------------------------------------------------
-digitsTestZ :: (Show n, Eq n, Padic n) => n -> n -> Property
-digitsTestZ t n = fromDigits (digits n) === n
+{-digitsTestZ :: LiftedRadix p prec => Z' p prec -> Property
+digitsTestZ n = fromDigits (digits n) === n
 
-digitsTestQ :: (Show n, Eq n, Padic n) => n -> n -> Property
-digitsTestQ t n = valuation n == 0 ==> fromDigits (digits n) === n
+digitsTestQ :: LiftedRadix p prec => Q' p prec -> Property
+digitsTestQ n = valuation n == 0 ==> fromDigits (digits n) === n
 
 digitsTests = testGroup "Conversion to and from digits"
-  [ testProperty "Z 2" $ digitsTestZ (0 :: Z 2)
-  , testProperty "Z 10" $ digitsTestZ (0 :: Z 10)
-  , testProperty "Z 257" $ digitsTestZ (0 :: Z 257)
-  , testProperty "Q 2" $ digitsTestQ (0 :: Q 2)
-  , testProperty "Q 13" $ digitsTestQ (0 :: Q 13)
-  , testProperty "Q 257" $ digitsTestQ (0 :: Q 257)
+  [ testProperty "Z 2" $ digitsTestZ @2
+  , testProperty "Z 10" $ digitsTestZ @10
+  , testProperty "Z 257" $ digitsTestZ @257
+  , testProperty "Q 2" $ digitsTestQ @2
+  , testProperty "Q 13" $ digitsTestQ @13
+  , testProperty "Q 257" $ digitsTestQ @257
   , testCase "1" $ firstDigit (1 :: Q 3) @?= 1
   , testCase "-1" $ firstDigit (-1 :: Q 3) @?= 2
   , testCase "2" $ firstDigit (0 :: Q 3) @?= 0
   , testCase "3" $ firstDigit (9 :: Q 3) @?= 0
   , testCase "4" $ firstDigit (9 :: Q 10) @?= 9
   ]
-  
+  -}
 ------------------------------------------------------------
 equivTest :: TestTree
 equivTest = testGroup "Equivalence tests"
@@ -94,7 +99,7 @@ equivTest = testGroup "Equivalence tests"
   ]
 
 ------------------------------------------------------------
-
+{-
 cycleTest :: TestTree
 cycleTest = testGroup "findCycle tests"
   [ testCase "1" $ findCycle 10 [1..5] @?= Nothing
@@ -110,7 +115,7 @@ cycleTest = testGroup "findCycle tests"
   , testCase "11" $ findCycle 10 ([0,2,3] ++ cycle [1,2,3]) @?= Just ([0],[2,3,1])
   , testCase "12" $ findCycle 200 ([1..99] ++ cycle [100..200]) @?= Just ([1..99],[100..200])
   ]
-
+-}
 ------------------------------------------------------------
 
 ------------------------------------------------------------
@@ -120,16 +125,15 @@ showTests = testGroup "String representation"
 showTestZ = testGroup "Z"
   [ testCase "0" $ show (0 :: Z 3) @?= "0"
   , testCase "3" $ show (3 :: Z 3) @?= "10"
-  , testCase "-3" $ show (-3 :: Z 3) @?= "(2)0"
+  , testCase "-3" $ show (-3 :: Z 3) @?= "…22222222222222222220"
   , testCase "123" $ show (123 :: Z 10) @?= "123"
   , testCase "123" $ show (123 :: Z 2) @?= "1111011"
   , testCase "123456789" $ show (123456789 :: Z' 10 5) @?= "…56789"
-  , testCase "-123" $ show (-123 :: Z 10) @?= "(9)877"
+  , testCase "-123" $ show (-123 :: Z 10) @?= "…99999999999999999877"
   , testCase "1/23" $ show (1 `div` 23 :: Z 10) @?= "…65217391304347826087"
-  , testCase "1/23" $ show (1 `div` 23 :: Z' 10 40) @?= "(6956521739130434782608)7"
   , testCase "1/23" $ show (1 `div` 23 :: Z' 17 5) @?= "… 8 14 13 5 3"
   , testCase "123456" $ show (123456 :: Z 257) @?= "1 223 96"
-  , testCase "123456" $ show (-123456 :: Z' 257 6) @?= "(256) 255 33 161"
+  , testCase "123456" $ show (-123456 :: Z' 257 6) @?= "… 256 256 256 255 33 161"
   ]
 
 showTestQ = testGroup "Q"
@@ -349,8 +353,7 @@ testSuite :: TestTree
 testSuite = testGroup "test"
   [
     showTests
-  , cycleTest
-  , digitsTests 
+  --, digitsTests 
   , equivTest
   , ringIsoZTests
   , ringIsoQTests

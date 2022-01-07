@@ -515,7 +515,7 @@ instance Radix p => Integral (Z p) where
   mod a m = fromInteger (toInteger a `mod` toInteger m)
   quotRem a b = (a `div` b, a `mod` b)
 
--- | For a given list extracts prefix and a cycle, limiting length of prefix and cycle by @len@.
+  how
 -- Uses the modified tortiose and hare method.
 findCycle :: Eq a => Int -> [a] -> ([a], [a])
 findCycle len lst =

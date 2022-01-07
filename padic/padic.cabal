@@ -11,7 +11,7 @@ homepage:       https://github.com/githubuser/padic#readme
 bug-reports:    https://github.com/githubuser/padic/issues
 author:         Author name here
 maintainer:     example@example.com
-copyright:      2021 Author name here
+copyright:      2022 Sergey B. Samoylenko
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
@@ -27,8 +27,10 @@ library
   exposed-modules:
       Math.NumberTheory.Padic
       Math.NumberTheory.Padic.Classes
+      Math.NumberTheory.Padic.Fixed
+      Math.NumberTheory.Padic.Fixed.Integer
+      Math.NumberTheory.Padic.Fixed.Rational
       Math.NumberTheory.Padic.Integer
-      Math.NumberTheory.Padic.Modular
       Math.NumberTheory.Padic.Rational
   other-modules:
       Paths_padic
@@ -53,6 +55,7 @@ test-suite padic-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      FixedSpec
       Paths_padic
   hs-source-dirs:
       test

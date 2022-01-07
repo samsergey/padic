@@ -4,7 +4,7 @@ github:              "githubuser/padic"
 license:             BSD3
 author:              "Author name here"
 maintainer:          "example@example.com"
-copyright:           "2021 Author name here"
+copyright:           "2022 Sergey B. Samoylenko"
 
 extra-source-files:
 - README.md
