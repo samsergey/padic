@@ -1,6 +1,6 @@
 {- |
 Module      : Math.NumberTheory.Padic
-Description : Representation a nd simple algebra for p-adic numbers.
+Description : Representation and simple algebra for p-adic numbers.
 Copyright   : (c) Sergey Samoylenko, 2022
 License     : GPL-3
 Maintainer  : samsergey@yandex.ru
@@ -12,15 +12,21 @@ of arbitratry precision, implementing basic arithmetic as well as some specific 
 i.e. detection of periodicity in sequence of digits, rational reconstruction, computation of square roots etc.
 
 In order to gain efficiency the integer p-adic number with radix \(p\) is internally
-represented as only one digit /lifted/ to modulo \(p^k\), where \(k\) is
-chosen so that within working precision integers and rationals could be
-reconstructed by by extended Euclidean method.
+represented as a list of digits /lifted/ to modulo \(p^k\), where \(k\) is
+chosen so that within working precision numbers belogning to @Int@ and @Ratio Int@ types could be
+reconstructed by extended Euclidean method, using only the first digit.
 
-Sequence of digits modulo \(p\) are used only for textual representation and may be obtained by 'digits' function. 
+\[
+x = ...ddddddddddddddd_{(p)} =  ... \underbrace{ddddd}_k\,\underbrace{ddddd}_k\,\underbrace{ddddd}_k{}_{(p^k)}
+\]
 
-The radix \(p\) of a p-adic number is specified at a type level via type-literals. In order to use them GHCi should be loaded with a couple of extensions.
+The infinite sequence of digits modulo \(p\) may be obtained by 'digits' function.
+Potential infinitness of digits is used for detection of cycles in the digit sequence of p-adic expansion.
+For more efficient implementation see `Math.NumberTheory.Padic.Fixed` module.
 
->>> :set -XDataKinds -XTypeOperators
+The radix \(p\) of a p-adic number is specified at a type level via type-literals. In order to use them in GHCi, set `-XDataKinds` extension on.
+
+>>> :set -XDataKinds
 >>> 45 :: Z 10
 45
 >>> 45 :: Q 5

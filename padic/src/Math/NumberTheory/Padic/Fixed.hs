@@ -1,6 +1,6 @@
 {- |
 Module      : Math.NumberTheory.Padic.Fixed
-Description : Representation a nd simple algebra for p-adic numbers with fixed precision.
+Description : Representation and simple algebra for p-adic numbers with fixed precision.
 Copyright   : (c) Sergey Samoylenko, 2022
 License     : GPL-3
 Maintainer  : samsergey@yandex.ru
@@ -13,8 +13,8 @@ i.e. rational reconstruction, computation of square roots etc.
 
 In order to gain efficiency the integer p-adic number with radix \(p\) is internally
 represented as only one digit /lifted/ to modulo \(p^k\), where \(k\) is
-chosen so that within working precision integers and rationals could be
-reconstructed by by extended Euclidean method. Sequence of digits modulo \(p\) are used only for textual representation and may be obtained by 'digits' function. 
+chosen so that within working precision numbers belogning to @Int@ and @Ratio Int@ types could be
+reconstructed by extended Euclidean method. 
 
 The radix \(p\) of a p-adic number is specified at a type level via type-literals. In order to use them GHCi should be loaded with a couple of extensions.
 
