@@ -2,7 +2,7 @@
 Module      : Math.NumberTheory.Padic
 Description : Representation and simple algebra for p-adic numbers.
 Copyright   : (c) Sergey Samoylenko, 2022
-License     : GPL-3
+License     : MIT
 Maintainer  : samsergey@yandex.ru
 Stability   : experimental
 Portability : POSIX
@@ -13,7 +13,7 @@ i.e. detection of periodicity in sequence of digits, rational reconstruction, co
 
 In order to gain efficiency the integer p-adic number with radix \(p\) is internally
 represented as a list of digits /lifted/ to modulo \(p^k\), where \(k\) is
-chosen so that within working precision numbers belogning to @Int@ and @Ratio Int@ types could be
+chosen so that within working precision numbers belogning to `Int` and `Ratio Int` could be
 reconstructed by extended Euclidean method, using only the first digit.
 
 \[

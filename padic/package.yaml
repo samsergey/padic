@@ -1,7 +1,7 @@
 name:                padic
 version:             0.1.0.0
 github:              "samsergey/padic"
-license:             BSD3
+license:             MIT
 author:              "Sergey B. Samoylenko"
 maintainer:          "samsergey@yandex.ru"
 copyright:           "2022 Sergey B. Samoylenko"

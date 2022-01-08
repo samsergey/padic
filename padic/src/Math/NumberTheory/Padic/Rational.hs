@@ -172,3 +172,20 @@ instance Radix p prec => Fractional (Q' p prec) where
 
 instance Radix p prec => Real (Q' p prec) where
   toRational n = toRational (unit n) / norm n
+
+pExp x | fromRational (norm x) < p ** (-1/(p-1)) = error "eExp does not converge!"
+       | otherwise = go 1000 0 1 1
+  where
+    p = fromIntegral (radix x)
+    go n s t i
+      | n <= 0 = s -- error "eExp failed to converge within precision!"
+      | valuation t' > precision x = s
+      | otherwise = go (n - 1) (s + t) t' (i+1)
+      where t' = t*x/i
+
+
+{-
+instance Radix p prec => Floating (Z' p prec) where
+  pi = undefined
+  exp = pExp
+-}

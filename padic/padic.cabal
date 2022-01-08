@@ -12,7 +12,7 @@ bug-reports:    https://github.com/samsergey/padic/issues
 author:         Sergey B. Samoylenko
 maintainer:     samsergey@yandex.ru
 copyright:      2022 Sergey B. Samoylenko
-license:        BSD3
+license:        MIT
 license-file:   LICENSE
 build-type:     Simple
 extra-source-files:
