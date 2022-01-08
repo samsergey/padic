@@ -4,54 +4,34 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE UnboxedTuples #-}
-{-# LANGUAGE UnliftedFFITypes #-}
-{-# LANGUAGE NoStarIsType #-}
 
-module Math.NumberTheory.Padic.Fixed.Integer where
+module Math.NumberTheory.Padic.Fixed.Integer  where
 
-import Data.List
+import Data.List (intercalate)
 import Data.Mod
 import Data.Ratio
-import GHC.TypeLits hiding (Mod)
+import GHC.TypeLits (Nat, natVal)
 import GHC.Integer.GMP.Internals (recipModInteger)
-import Data.Constraint (Constraint)
-
 import Math.NumberTheory.Padic.Classes
 
 ------------------------------------------------------------
-type family Lifted p prec where
-  Lifted p prec = p ^ (2*prec + 1)
-
-type family LiftedRadix p prec :: Constraint where
-  LiftedRadix p prec =
-    ( KnownNat prec
-    , KnownNat p
-    , ValidRadix p
-    , KnownNat (p ^ (2*prec + 1))
-    , ValidRadix (p ^ (2*prec + 1))
-    )
-
 -- |  Integer p-adic number (an element of \(\mathbb{Z}_p\)) with 20 digits precision.
 type Z p = Z' p 20
 
 -- |  Integer p-adic number with explicitly specified precision.
-newtype Z' (p :: Nat) (prec :: Nat) = Z' (Z_ prec p)
+newtype Z' (p :: Nat) (prec :: Nat) = Z' (R prec p)
+newtype R (prec :: Nat ) (p :: Nat) = R (Mod (LiftedRadix p prec))
 
-deriving via Z_ prec p instance (LiftedRadix p prec) => Num (Z' p prec)
+deriving via Mod (LiftedRadix p prec) instance Radix p prec => Num (R prec p)
+deriving via R prec p instance Radix p prec => Num (Z' p prec)
 
-newtype Z_ (prec :: Nat ) (p :: Nat) = Z_ (Mod (Lifted p prec))
-
-deriving via Mod (Lifted p prec) instance (LiftedRadix p prec) => Num (Z_ prec p)
-
-instance LiftedRadix p prec => Eq (Z' p prec) where
-  x@(Z' (Z_ a)) == Z' (Z_ b) = unMod a `mod` pk == unMod b `mod` pk
+instance Radix p prec => Eq (Z' p prec) where
+  x@(Z' (R a)) == Z' (R b) = unMod a `mod` pk == unMod b `mod` pk
     where
       pk = radix x ^ precision x
 
-instance LiftedRadix p prec => Show (Z' p prec) where
+instance Radix p prec => Show (Z' p prec) where
   show 0 = "0"
   show n  
     | length ds > pr = ell ++ toString (take pr ds)
@@ -66,16 +46,16 @@ instance LiftedRadix p prec => Show (Z' p prec) where
         | radix n < 11 = ""
         | otherwise = " "
 
-instance LiftedRadix p prec => Padic (Z' p prec) where
+instance Radix p prec => Padic (Z' p prec) where
   type Unit (Z' p prec) = Z' p prec
-  type LiftedDigits (Z' p prec) = Integer
+  type Lifted (Z' p prec) = Integer
   type Digit (Z' p prec) = Mod p 
 
   {-# INLINE precision #-}
   precision = fromIntegral . natVal
 
   {-# INLINE  radix #-}
-  radix (Z' n) = fromIntegral $ natVal n
+  radix (Z' r) = fromIntegral $ natVal r
   
   {-# INLINE fromDigits #-}
   fromDigits = mkUnit . fromRadix
@@ -84,10 +64,10 @@ instance LiftedRadix p prec => Padic (Z' p prec) where
   digits n = toRadix (lifted n)
 
   {-# INLINE lifted #-}
-  lifted (Z' (Z_ n)) = lifted n
+  lifted (Z' (R n)) = lifted n
 
   {-# INLINE mkUnit #-}
-  mkUnit = Z' . Z_ . fromInteger
+  mkUnit = Z' . R . fromInteger
 
   {-# INLINE fromUnit #-}
   fromUnit (u, v) = mkUnit $ radix u ^ fromIntegral v * lifted u
@@ -100,17 +80,17 @@ instance LiftedRadix p prec => Padic (Z' p prec) where
     where
       p = radix n
   
-  inverse (Z' (Z_ n))  = Z' . Z_ <$> invertMod n
+  inverse (Z' (R n))  = Z' . R <$> invertMod n
 
-instance LiftedRadix p prec  => Enum (Z' p prec) where
+instance Radix p prec  => Enum (Z' p prec) where
   toEnum = fromIntegral
   fromEnum = fromIntegral . toInteger
 
-instance LiftedRadix p prec => Real (Z' p prec) where
+instance Radix p prec => Real (Z' p prec) where
   toRational 0 = 0
   toRational n = extEuclid (lifted n, liftedRadix n)
 
-instance LiftedRadix p prec => Integral (Z' p prec) where
+instance Radix p prec => Integral (Z' p prec) where
   toInteger n = if denominator r == 1
                 then numerator r
                 else lifted n `mod` (radix n ^ precision n)
@@ -120,7 +100,6 @@ instance LiftedRadix p prec => Integral (Z' p prec) where
     Nothing -> error "not divisible!" 
     Just r -> let q = a*r in (q, a - q * b)
 
-
-instance LiftedRadix p prec => Ord (Z' p prec) where
+instance Radix p prec => Ord (Z' p prec) where
   compare = error "ordering is not defined for Z"
 

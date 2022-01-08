@@ -4,13 +4,15 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE NoStarIsType #-}
 
 module Math.NumberTheory.Padic.Classes  where
 
 import Data.Ratio
 import Data.List (unfoldr, genericLength)
-import Data.Maybe (isJust)
+import Data.Maybe (isJust, maybeToList)
 import Data.Mod  
 import GHC.TypeLits hiding (Mod)
 import Data.Constraint (Constraint)
@@ -25,16 +27,18 @@ type family ValidRadix (m :: Nat) :: Constraint where
   ValidRadix m = ()
 
 -- | Constraint for valid radix of a number
-type Radix m = ( ValidRadix m , KnownNat m)
+type KnownRadix m = ( ValidRadix m , KnownNat m )
+  
+-- | Radix of the internal representation of integer p-adic number.
+type family LiftedRadix p prec where
+  LiftedRadix p prec = p ^ (2*prec + 1)
 
--- | Constraint for regular p-adic number.
-type family RealPadic n p prec :: Constraint where
-  RealPadic n p prec =
-    ( Padic n
-    , Padic (Unit n)
-    , Real n
-    , Radix p
-    , KnownNat prec
+-- | Constraint for known valid radix of p-adic number as well as it's  lifted radix.
+type family Radix p prec :: Constraint where
+  Radix p prec =
+    ( KnownNat prec
+    , KnownRadix p
+    , KnownRadix (LiftedRadix p prec)
     )
 
 ------------------------------------------------------------
@@ -43,10 +47,10 @@ class Padic n where
   -- | A type for p-adic unit.
   type Unit n
   -- | A type for digits of p-adic expansion.
-  -- This type allows to assure that digits will agree with the radix @p@ of the number.
+  -- Associated type allows to assure that digits will agree with the radix @p@ of the number.
   type Digit n
   -- | Internal representation of p-adic number.
-  type LiftedDigits n
+  type Lifted n
   -- | Returns the precision of a number.
   --
   -- Examples:
@@ -87,10 +91,10 @@ class Padic n where
   -- [(123 `modulo` 10000000000000000000),(0 `modulo` 10000000000000000000),(0 `modulo` 10000000000000000000)]
   -- >>> take 3 $ lifted (-123 :: Z 2)
   -- [(9223372036854775685 `modulo` 9223372036854775808),(9223372036854775807 `modulo` 9223372036854775808),(9223372036854775807 `modulo` 9223372036854775808)]
-  lifted :: n -> LiftedDigits n
+  lifted :: n -> Lifted n
 
   -- | Creates digital object from it's lifted digits.
-  mkUnit :: LiftedDigits n -> n
+  mkUnit :: Lifted n -> n
 
   -- | Creates p-adic number from given unit and valuation.
   --
@@ -160,9 +164,9 @@ isZero :: Padic n => n -> Bool
 {-# INLINE isZero #-}
 isZero n = valuation n >= precision n
 
-instance Radix p => Padic (Mod p) where
+instance KnownRadix p => Padic (Mod p) where
   type Unit (Mod p) = Mod p
-  type LiftedDigits (Mod p) = Integer
+  type Lifted (Mod p) = Integer
   type Digit (Mod p) = Mod p
   radix = fromIntegral . natVal
   precision _ = fromIntegral (maxBound :: Int)
@@ -177,7 +181,7 @@ instance Radix p => Padic (Mod p) where
   splitUnit u = (u, 0)
 
 -- | Unfolds a number to a list of digits (integers modulo @p@).  
-toRadix :: Radix p => Integer -> [Mod p]
+toRadix :: KnownRadix p => Integer -> [Mod p]
 toRadix 0 = [0]
 toRadix n = res
   where
@@ -189,7 +193,7 @@ toRadix n = res
        in Just (fromIntegral r, q)
   
 -- | Folds a list of digits (integers modulo @p@) to a number.
-fromRadix :: Radix p => [Mod p] -> Integer
+fromRadix :: KnownRadix p => [Mod p] -> Integer
 fromRadix ds = foldr (\x r -> lifted x + r * p) 0 ds
   where
     p = fromIntegral $ natVal $ head $ 0 : ds
@@ -247,3 +251,64 @@ getUnitQ p x = (c, genericLength v2 - genericLength v1)
 liftedRadix :: (Padic n, Integral a) => n -> a
 {-# INLINE liftedRadix #-}
 liftedRadix n = radix n ^ (2*precision n + 1)
+
+{- | For given radix \(p\) and natural number \(m\) returns precision sufficient for rational
+reconstruction of fractions with numerator and denominator not exceeding \(m\).
+
+Examples:
+
+>>> sufficientPrecision 2 (maxBound :: Int)
+64
+>>> sufficientPrecision 3 (maxBound :: Int)
+41
+>>> sufficientPrecision 10 (maxBound :: Int)
+20
+-}
+sufficientPrecision :: (Integral a) => Integer -> a -> Integer
+sufficientPrecision p m = ilog p (2 * fromIntegral m) + 1
+
+  
+{- | Returns p-adic solution of the equation \(f(x) = 0\) by Hensel lifting solutions of \(f(x) = 0\ \mathrm{mod}\ p\).
+
+Examples:
+
+>>> henselLifting (\x -> x*x - 2) (\x -> 2*x) :: [Z 7]
+[…64112011266421216213,…02554655400245450454]
+>>> henselLifting (\x -> x*x - x) (\x -> 2*x-1) :: [Q 10]
+[0,1,…92256259918212890625,…07743740081787109376]
+-}
+henselLifting ::
+     (Eq n, Num n, Padic n, KnownRadix p, Digit n ~ Mod p)
+  => (n -> n) -- ^ Function to be vanished.
+  -> (n -> n) -- ^ Derivative of the function.
+  -> [n] -- ^ The result.
+henselLifting f f' = res
+  where
+    pr = precision (head res)
+    res = findSolutionMod f >>= iterateM pr step
+    step x = do
+      invf' <- maybeToList (inverse (f' x))
+      return (x - f x * invf')
+
+{- | Returns solution of the equation \(f(x) = 0\ \mathrm{mod}\ p\) in p-adics.
+
+>>> findSolutionMod (\x -> x*x - 2) :: [Z 7]
+[3,4]
+>>> findSolutionMod (\x -> x*x - x) :: [Q 10]
+[0.0,1.0,5.0,6.0]
+-}
+findSolutionMod :: (Padic n, KnownRadix p, Digit n ~ Mod p)
+                => (n -> n) -> [n]
+findSolutionMod f = [ fromMod d | d <- [0..], fm d == 0 ]
+  where
+    fm = firstDigit . f . fromMod
+    fromMod x = fromDigits [x]
+
+iterateM :: (Eq a, Monad m) => Int -> (a -> m a) -> a -> m a
+iterateM n f = go n
+  where
+    go 0 x = pure x
+    go i x = do
+      y <- f x
+      if x == y then pure x else go (i - 1) y
+   

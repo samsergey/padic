@@ -1,18 +1,19 @@
 {-# OPTIONS_HADDOCK hide, prune, ignore-exports #-}
 
-{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module Math.NumberTheory.Padic.Fixed.Rational where
+module Math.NumberTheory.Padic.Fixed.Rational
+  ( Q
+  , Q'
+  , normalize
+  ) where
 
 import Data.List (intercalate)
 import Data.Ratio
 import Data.Mod
-import GHC.TypeLits hiding (Mod)
+import GHC.TypeLits (Nat, natVal)
 import Math.NumberTheory.Padic.Classes
 import Math.NumberTheory.Padic.Fixed.Integer
 
@@ -24,7 +25,7 @@ type Q p = Q' p 20
 -- |  Rational p-adic number with explicitly specified precision.
 newtype Q' (p :: Nat) (prec :: Nat) = Q' (Z' p prec, Int)
 
-instance LiftedRadix p prec => Show (Q' p prec) where
+instance Radix p prec => Show (Q' p prec) where
   show n = si ++ sep ++ "." ++ sep ++ sf
     where
       pr = precision n
@@ -48,9 +49,9 @@ instance LiftedRadix p prec => Show (Q' p prec) where
         | radix n < 11 = ""
         | otherwise = " "
 
-instance LiftedRadix p prec => Padic (Q' p prec) where
+instance Radix p prec => Padic (Q' p prec) where
   type Unit (Q' p prec) = Z' p prec
-  type LiftedDigits (Q' p prec) = Integer
+  type Lifted (Q' p prec) = Integer
   type Digit (Q' p prec) = Digit (Z' p prec)
 
   {-# INLINE precision #-}
@@ -93,7 +94,7 @@ Examples:
 (3700,0)
 >>> splitUnit (normalize x)
 (37,2) -}
-normalize :: LiftedRadix p prec => Q' p prec -> Q' p prec
+normalize :: Radix p prec => Q' p prec -> Q' p prec
 normalize n@(Q' (0, _)) = Q' (0, precision n)
 normalize n@(Q' (u, v)) = go (lifted u) v
   where
@@ -109,7 +110,7 @@ normalize n@(Q' (u, v)) = go (lifted u) v
     pr = precision n
     zero = Q' (0, pr)
 
-instance LiftedRadix p prec => Eq (Q' p prec) where
+instance Radix p prec => Eq (Q' p prec) where
   a' == b' =
     (isZero a && isZero b)
     || (valuation a == valuation b && unit a == unit b)
@@ -117,28 +118,28 @@ instance LiftedRadix p prec => Eq (Q' p prec) where
       a = normalize a'
       b = normalize b'
 
-instance LiftedRadix p prec => Ord (Q' p prec) where
+instance Radix p prec => Ord (Q' p prec) where
   compare = error "Order is nor defined for p-adics."
 
-instance LiftedRadix p prec => Num (Q' p prec) where
+instance Radix p prec => Num (Q' p prec) where
   fromInteger n = normalize $ Q' (fromInteger n, 0)
           
-  x@(Q' (Z' (Z_ a), va)) + Q' (Z' (Z_ b), vb) =
+  x@(Q' (Z' (R a), va)) + Q' (Z' (R b), vb) =
     case compare va vb of
-      LT -> Q' (Z' (Z_ (a + p ^% (vb - va) * b)), va)
-      EQ -> Q' (Z' (Z_ (a + b)), va)
-      GT -> Q' (Z' (Z_ (p ^% (va - vb) * a + b)), vb)
+      LT -> Q' (Z' (R (a + p ^% (vb - va) * b)), va)
+      EQ -> Q' (Z' (R (a + b)), va)
+      GT -> Q' (Z' (R (p ^% (va - vb) * a + b)), vb)
     where
       p = fromInteger (radix x)
       
-  Q' (Z' (Z_ a), va) * Q' (Z' (Z_ b), vb) = Q' (Z' (Z_ (a * b)), va + vb)
+  Q' (Z' (R a), va) * Q' (Z' (R b), vb) = Q' (Z' (R (a * b)), va + vb)
       
   negate (Q' (u, v)) = Q' (negate u, v)
   abs = id
   signum 0 = 0
   signum _ = 1
 
-instance LiftedRadix p prec => Fractional (Q' p prec) where
+instance Radix p prec => Fractional (Q' p prec) where
   fromRational 0 = 0
   fromRational x = res
     where
@@ -154,5 +155,5 @@ instance LiftedRadix p prec => Fractional (Q' p prec) where
         | otherwise = 
           error $ show b' ++ " is indivisible in " ++ show (radix a) ++ "-adics!"
 
-instance LiftedRadix p prec => Real (Q' p prec) where
+instance Radix p prec => Real (Q' p prec) where
   toRational n = toRational (unit n) / norm n
