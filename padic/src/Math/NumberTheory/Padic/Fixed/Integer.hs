@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS_HADDOCK hide, prune, ignore-exports #-}
 
 {-# LANGUAGE DerivingVia #-}
@@ -18,23 +19,22 @@ import Math.NumberTheory.Padic.Classes
 
 ------------------------------------------------------------
 
-type instance Padic Fixed p prec = Z p prec
-type instance Padic Word32 p _ = Z p (SufficientPrecision Word32 p)
-type instance Padic Int p _ = Z p (SufficientPrecision Int p)
+-- |  Integer p-adic number (an element of \(\mathbb{Z}_p\)) with default 20-digit precision.
+type Z p = Z' p 20
 
 -- |  Integer p-adic number with explicitly specified precision.
-newtype Z (p :: Nat) (prec :: Nat) = Z (R prec p)
+newtype Z' (p :: Nat) (prec :: Nat) = Z' (R prec p)
 newtype R (prec :: Nat ) (p :: Nat) = R (Mod (LiftedRadix p prec))
 
 deriving via Mod (LiftedRadix p prec) instance Radix p prec => Num (R prec p)
-deriving via R prec p instance Radix p prec => Num (Z p prec)
+deriving via R prec p instance Radix p prec => Num (Z' p prec)
 
-instance Radix p prec => Eq (Z p prec) where
-  x@(Z (R a)) == Z (R b) = unMod a `mod` pk == unMod b `mod` pk
+instance Radix p prec => Eq (Z' p prec) where
+  x@(Z' (R a)) == Z' (R b) = unMod a `mod` pk == unMod b `mod` pk
     where
       pk = radix x ^ precision x
 
-instance Radix p prec => Show (Z p prec) where
+instance Radix p prec => Show (Z' p prec) where
   show 0 = "0"
   show n  
     | length ds > pr = ell ++ toString (take pr ds)
@@ -49,16 +49,16 @@ instance Radix p prec => Show (Z p prec) where
         | radix n < 11 = ""
         | otherwise = " "
 
-instance Radix p prec => PadicNum (Z p prec) where
-  type Unit (Z p prec) = Z p prec
-  type Lifted (Z p prec) = Integer
-  type Digit (Z p prec) = Mod p 
+instance Radix p prec => PadicNum (Z' p prec) where
+  type Unit (Z' p prec) = Z' p prec
+  type Lifted (Z' p prec) = Integer
+  type Digit (Z' p prec) = Mod p 
 
   {-# INLINE precision #-}
   precision = fromIntegral . natVal
 
   {-# INLINE  radix #-}
-  radix (Z r) = fromIntegral $ natVal r
+  radix (Z' r) = fromIntegral $ natVal r
   
   {-# INLINE fromDigits #-}
   fromDigits = mkUnit . fromRadix
@@ -67,10 +67,10 @@ instance Radix p prec => PadicNum (Z p prec) where
   digits n = toRadix (lifted n)
 
   {-# INLINE lifted #-}
-  lifted (Z (R n)) = lifted n
+  lifted (Z' (R n)) = lifted n
 
   {-# INLINE mkUnit #-}
-  mkUnit = Z . R . fromInteger
+  mkUnit = Z' . R . fromInteger
 
   {-# INLINE fromUnit #-}
   fromUnit (u, v) = mkUnit $ radix u ^ fromIntegral v * lifted u
@@ -83,17 +83,17 @@ instance Radix p prec => PadicNum (Z p prec) where
     where
       p = radix n
   
-  inverse (Z (R n))  = Z . R <$> invertMod n
+  inverse (Z' (R n))  = Z' . R <$> invertMod n
 
-instance Radix p prec  => Enum (Z p prec) where
+instance Radix p prec  => Enum (Z' p prec) where
   toEnum = fromIntegral
   fromEnum = fromIntegral . toInteger
 
-instance Radix p prec => Real (Z p prec) where
+instance Radix p prec => Real (Z' p prec) where
   toRational 0 = 0
   toRational n = extEuclid (lifted n, liftedRadix n)
 
-instance Radix p prec => Integral (Z p prec) where
+instance Radix p prec => Integral (Z' p prec) where
   toInteger n = if denominator r == 1
                 then numerator r
                 else lifted n `mod` (radix n ^ precision n)
@@ -103,6 +103,6 @@ instance Radix p prec => Integral (Z p prec) where
     Nothing -> error "not divisible!" 
     Just r -> let q = a*r in (q, a - q * b)
 
-instance Radix p prec => Ord (Z p prec) where
+instance Radix p prec => Ord (Z' p prec) where
   compare = error "ordering is not defined for Z"
 

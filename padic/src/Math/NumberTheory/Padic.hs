@@ -56,14 +56,20 @@ By default the precision of p-adics is bounded by 20 digits. However precision c
 -}
 ------------------------------------------------------------
 module Math.NumberTheory.Padic
-  ( 
+  (  
+  -- * Data types
+  -- ** p-Adic integers
+    Z
+  , Z'
+  -- ** p-Adic rationals
+  , Q
+  , Q'
   -- * Classes and functions
   -- ** Type synonyms and constraints
-    ValidRadix
+  , ValidRadix
   , KnownRadix
   , LiftedRadix
   , Radix
-  , Padic
   -- ** p-adic numbers
   , PadicNum
   , Unit
@@ -85,13 +91,6 @@ module Math.NumberTheory.Padic
   , inverse
   , isInvertible
   , isZero
-  -- * Data types
-  -- ** p-Adic integers
-  , Z
-  , Z'
-  -- ** p-Adic rationals
-  , Q
-  , Q'
   -- * Functions and utilities
   , fromRadix
   , toRadix
@@ -99,17 +98,10 @@ module Math.NumberTheory.Padic
   , getUnitZ
   , getUnitQ
   , findSolutionMod
-  , henselLifting
+  , henselLifting 
   ) where
 
 import Math.NumberTheory.Padic.Classes
-import Data.Ratio
+import Math.NumberTheory.Padic.Integer
+import Math.NumberTheory.Padic.Rational
 
--- |  Integer p-adic number (an element of \(\mathbb{Z}_p\)).
-type Z p = Padic Integer p 0
--- |  Integer p-adic number with explicitly specified precision.
-type Z' p prec = Padic Free p prec
--- |  Rational p-adic number (an element of \(\mathbb{Q}_p\)).
-type Q p = Padic (Ratio Integer) p 0
--- |  Rational p-adic number with explicitly specified precision.
-type Q' p prec = Padic (Ratio Free) p prec

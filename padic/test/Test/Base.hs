@@ -9,8 +9,11 @@
 
 module Test.Base where
 
-import qualified Math.NumberTheory.Padic.Fixed as F
-import Math.NumberTheory.Padic
+import qualified Math.NumberTheory.Padic.Fixed.Rational
+import qualified Math.NumberTheory.Padic.Fixed.Integer
+import qualified Math.NumberTheory.Padic.Rational
+import qualified Math.NumberTheory.Padic.Integer
+import Math.NumberTheory.Padic.Classes
 
 import GHC.TypeLits hiding (Mod)
 import Test.Tasty
@@ -19,13 +22,14 @@ import Test.Tasty.QuickCheck
 import Test.Tasty.ExpectedFailure
 import Test.QuickCheck
 import Data.Mod
+import Data.Word
 import Data.Ratio
 import Data.Maybe
 
 instance KnownRadix m => Arbitrary (Mod m) where
   arbitrary = fromInteger <$> arbitrary
 
-instance Radix p prec => Arbitrary (Z' p prec) where
+instance Radix p prec => Arbitrary (Math.NumberTheory.Padic.Integer.Z' p prec) where
   arbitrary = oneof [integerZ, rationalZ, arbitraryZ]
     where
       integerZ = fromInteger <$> arbitrary
@@ -37,7 +41,7 @@ instance Radix p prec => Arbitrary (Z' p prec) where
       shrink _ = []
 
 
-instance Radix p prec => Arbitrary (F.Z' p prec) where
+instance Radix p prec => Arbitrary (Math.NumberTheory.Padic.Fixed.Integer.Z' p prec) where
   arbitrary = oneof [integerZ, rationalZ, arbitraryZ]
     where
       integerZ = fromInteger <$> arbitrary
@@ -53,12 +57,13 @@ newtype SmallRational = SmallRational (Rational)
 
 instance Arbitrary SmallRational where
   arbitrary = do
-    n <- chooseInteger (-65535,65535)
-    d <- chooseInteger (1,65535)
+    let m = fromIntegral (maxBound :: Word32)
+    n <- chooseInteger (-m, m)
+    d <- chooseInteger (1,m)
     return $ SmallRational (n % d)
   shrink (SmallRational r) = SmallRational <$> []
  
-instance Radix p prec => Arbitrary (Q' p prec) where
+instance Radix p prec => Arbitrary (Math.NumberTheory.Padic.Rational.Q' p prec) where
   arbitrary = oneof [integerQ, rationalQ, arbitraryQ]
     where
       integerQ = fromInteger <$> arbitrary
@@ -68,7 +73,7 @@ instance Radix p prec => Arbitrary (Q' p prec) where
         return $ fromRational r
   shrink _ = []
 
-instance Radix p prec => Arbitrary (F.Q' p prec) where
+instance Radix p prec => Arbitrary (Math.NumberTheory.Padic.Fixed.Rational.Q' p prec) where
   arbitrary = oneof [integerQ, rationalQ, arbitraryQ]
     where
       integerQ = fromInteger <$> arbitrary

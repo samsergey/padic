@@ -51,16 +51,16 @@ equivTest = testGroup "Equivalence tests"
 showTests = testGroup "String representation"
   [ testCase "0" $ show (0 :: Q 3) @?= "0.0"
   , testCase "3" $ show (3 :: Q 3) @?= "10.0"
-  , testCase "-3" $ show (-3 :: Q 3) @?= "(2)0.0"
+  , testCase "-3" $ show (-3 :: Q 3) @?= "…22222222222222222220.0"
   , testCase "123" $ show (123 :: Q 10) @?= "123.0"
   , testCase "123" $ show (123 :: Q 2) @?= "1111011.0"
-  , testCase "-123" $ show (-123 :: Q 10) @?= "(9)877.0"
+  , testCase "-123" $ show (-123 :: Q 10) @?= "…99999999999999999877.0"
   , testCase "1/2" $ show (1/2 :: Q 2) @?= "0.1"
-  , testCase "-1/2" $ show (-1/2 :: Q 2) @?= "(1).1"
-  , testCase "1/15" $ show (1/15 :: Q 3) @?= "(1210).2"
-  , testCase "1/700" $ show (1/700 :: Q 10) @?= "(428571).43"
-  , testCase "100/7" $ show (100/7 :: Q 10) @?= "(285714)300.0"
-  , testCase "1/23" $ show (1/23 :: Q 10) @?= "…347826087.0"
+  , testCase "-1/2" $ show (-1/2 :: Q 2) @?= "…11111111111111111111.1"
+  , testCase "1/15" $ show (1/15 :: Q 3) @?= "…12101210121012101210.2"
+  , testCase "1/700" $ show (1/700 :: Q 10) @?= "…71428571428571428571.43"
+  , testCase "100/7" $ show (100/7 :: Q 10) @?= "…85714285714285714300.0"
+  , testCase "1/23" $ show (1/23 :: Q 10) @?= "…65217391304347826087.0"
   , testCase "1/23" $ show (1/23 :: Q' 17 5) @?= "… 8 14 13 5 3 . 0"
   , testCase "123456" $ show (123456 :: Q' 257 4) @?= "1 223 96 . 0"
   , testCase "123456" $ show (-123456 :: Q' 257 6) @?= "… 256 256 256 255 33 161 . 0"
@@ -93,9 +93,12 @@ psi :: (Fractional n, Real n) => n -> SmallRational
 psi = SmallRational . toRational 
 
 ringIsoQTests = testGroup "Ring isomorphism"
-  [ ringIsoQ "Q' 2 33" (0 :: Q' 2 34)
-  , ringIsoQ "Q' 3 21" (0 :: Q' 3 21)
-  , ringIsoQ "Q' 257 5" (0 :: Q' 257 5)
+  [ ringIsoQ "Q 2" (0 :: Q' 2 68)
+  , ringIsoQ "Q 3" (0 :: Q' 3 45)
+  , ringIsoQ "Q 5" (0 :: Q' 5 29)
+  , ringIsoQ "Q 7" (0 :: Q' 7 26)
+  , ringIsoQ "Q 13" (0 :: Q 13)
+  , ringIsoQ "Q 257" (0 :: Q 257)
   ]
 
 ------------------------------------------------------------

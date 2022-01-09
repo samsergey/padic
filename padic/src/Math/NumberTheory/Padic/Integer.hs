@@ -17,24 +17,23 @@ import GHC.Integer.GMP.Internals (recipModInteger)
 import Math.NumberTheory.Padic.Classes
 
 ------------------------------------------------------------
-
-type instance Padic () p prec = Z p prec
-type instance Padic Integer p _ = Z p (SufficientPrecision Word32 p)
+-- |  Integer p-adic number (an element of \(\mathbb{Z}_p\)) with default 20-digit precision.
+type Z p = Z' p 20
 
 -- |  Integer p-adic number with explicitly specified precision.
-newtype Z (p :: Nat) (prec :: Nat) = Z (R prec p)
+newtype Z' (p :: Nat) (prec :: Nat) = Z' (R prec p)
 newtype R (prec :: Nat ) (p :: Nat) = R [Mod (LiftedRadix p prec)]
 
-instance Radix p prec => PadicNum (Z p prec) where
-  type Unit (Z p prec) = Z p prec
-  type Lifted (Z p prec) = [Mod (LiftedRadix p prec)]
-  type Digit (Z p prec) = Mod p 
+instance Radix p prec => PadicNum (Z' p prec) where
+  type Unit (Z' p prec) = Z' p prec
+  type Lifted (Z' p prec) = [Mod (LiftedRadix p prec)]
+  type Digit (Z' p prec) = Mod p 
 
   {-# INLINE precision #-}
   precision = fromIntegral . natVal
 
   {-# INLINE  radix #-}
-  radix (Z r) = fromIntegral $ natVal r
+  radix (Z' r) = fromIntegral $ natVal r
   
   fromDigits ds = res
     where
@@ -43,13 +42,13 @@ instance Radix p prec => PadicNum (Z p prec) where
                in Just (fromInteger $ fromRadix a, b)
       chunks n = ilog (radix n) (liftedRadix n)
       
-  digits (Z (R ds)) = ds >>= toRadix . lifted
+  digits (Z' (R ds)) = ds >>= toRadix . lifted
 
   {-# INLINE lifted #-}
-  lifted (Z (R ds)) = ds
+  lifted (Z' (R ds)) = ds
 
   {-# INLINE mkUnit #-}
-  mkUnit = Z . R 
+  mkUnit = Z' . R 
 
   {-# INLINE fromUnit #-}
   fromUnit (u, v) = fromIntegral (radix u ^ v) * u
@@ -68,7 +67,7 @@ instance Radix p prec => PadicNum (Z p prec) where
       pr = precision n
       zero = (0, pr)
   
-  isInvertible n@(Z (R (d:_))) = (unMod d `mod` p) `gcd` p == 1
+  isInvertible n@(Z' (R (d:_))) = (unMod d `mod` p) `gcd` p == 1
     where
       p = radix n
   isInvertible _ = False
@@ -82,7 +81,7 @@ shiftL s (d1:d2:ds) =
       pk = fromIntegral (radix s `div` lifted s)
   in d1 + fromIntegral r * pk : shiftL s (fromIntegral q : ds)
 
-instance Radix p prec => Show (Z p prec) where
+instance Radix p prec => Show (Z' p prec) where
   show n = 
      case findCycle pr ds of
        Nothing -> ell ++ toString (take pr ds)
@@ -104,13 +103,13 @@ instance Radix p prec => Show (Z p prec) where
         | radix n < 11 = ""
         | otherwise = " "
 
-instance Radix p prec => Eq (Z p prec) where
-  x@(Z (R (a:_))) == Z (R (b:_)) = unMod a `mod` pk == unMod b `mod` pk
+instance Radix p prec => Eq (Z' p prec) where
+  x@(Z' (R (a:_))) == Z' (R (b:_)) = unMod a `mod` pk == unMod b `mod` pk
     where
       pk = radix x ^ precision x
   _ == _ = False
   
-instance Radix p prec => Num (Z p prec) where
+instance Radix p prec => Num (Z' p prec) where
   fromInteger n
     | n < 0 = -fromInteger (-n)
     | otherwise = mkUnit (d:ds)
@@ -119,9 +118,9 @@ instance Radix p prec => Num (Z p prec) where
   abs = id
   signum 0 = 0
   signum _ = 1
-  Z (R a) + Z (R b) = Z . R $ addZ a b
-  Z (R a) * Z (R b) = Z . R $ mulZ a b
-  negate (Z (R a)) = Z (R (negZ a))
+  Z' (R a) + Z' (R b) = Z' . R $ addZ a b
+  Z' (R a) * Z' (R b) = Z' . R $ mulZ a b
+  negate (Z' (R a)) = Z' (R (negZ a))
 
 negZ :: KnownRadix p => [Mod p] -> [Mod p]
 {-# INLINE negZ #-}
@@ -157,17 +156,17 @@ scaleZ s =
   snd . mapAccumL (\r x -> carry (unMod s * unMod x + r)) 0
 
 
-instance Radix p prec  => Enum (Z p prec) where
+instance Radix p prec  => Enum (Z' p prec) where
   toEnum = fromIntegral
   fromEnum = fromIntegral . toInteger
 
-instance Radix p prec => Real (Z p prec) where
+instance Radix p prec => Real (Z' p prec) where
   toRational 0 = 0
-  toRational n@(Z (R (d:_))) = extEuclid (lifted d, liftedRadix n)
+  toRational n@(Z' (R (d:_))) = extEuclid (lifted d, liftedRadix n)
   toRational _ = 0
 
-instance Radix p prec => Integral (Z p prec) where
-  toInteger n@(Z (R (d:_))) =
+instance Radix p prec => Integral (Z' p prec) where
+  toInteger n@(Z' (R (d:_))) =
     if denominator r == 1
     then numerator r
     else lifted d `mod` (radix n ^ precision n)
@@ -179,8 +178,8 @@ instance Radix p prec => Integral (Z p prec) where
     Just q -> (q, a - q * b)
 
 -- Division which does not raize exceptions.
-divMaybe :: Radix p prec => Z p prec -> Z p prec -> Maybe (Z p prec)
-divMaybe (Z (R a)) (Z (R b)) = Z . R <$> divZ a b
+divMaybe :: Radix p prec => Z' p prec -> Z' p prec -> Maybe (Z' p prec)
+divMaybe (Z' (R a)) (Z' (R b)) = Z' . R <$> divZ a b
 
 divZ :: KnownRadix p => [Mod p] -> [Mod p] -> Maybe [Mod p]
 divZ _ [] = Nothing
@@ -192,5 +191,5 @@ divZ a (b:bs) = go a <$> invertMod b
           mulAndSub = addZ xs . negZ . scaleZ m
        in m : go (tail $ mulAndSub (b : bs)) r
 
-instance Radix p prec => Ord (Z p prec) where
+instance Radix p prec => Ord (Z' p prec) where
   compare = error "ordering is not defined for Z"

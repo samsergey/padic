@@ -43,9 +43,20 @@ However precision could be specified explicitly:
 ------------------------------------------------------------
 module Math.NumberTheory.Padic.Fixed
 ( 
+  -- * Data types
+  -- ** p-Adic integers
+    Z
+  , Z'
+  -- ** p-Adic rationals
+  , Q
+  , Q'
   -- * Classes and functions
+  -- ** Type synonyms and constraints
+  , ValidRadix
+  , KnownRadix
+  , LiftedRadix
+  , Radix
   -- ** p-adic numbers
-    Padic
   , PadicNum
   , Unit
   , Digit
@@ -66,18 +77,6 @@ module Math.NumberTheory.Padic.Fixed
   , inverse
   , isInvertible
   , isZero
-  -- ** Type synonyms and constraints
-  , ValidRadix
-  , KnownRadix
-  , LiftedRadix
-  , Radix
-  -- * Data types
-  -- ** p-Adic integers
-  , Z
-  , Z'
-  -- ** p-Adic rationals
-  , Q
-  , Q'
   -- * Functions and utilities
   , fromRadix
   , toRadix
@@ -88,13 +87,6 @@ module Math.NumberTheory.Padic.Fixed
   , henselLifting ) where
 
 import Math.NumberTheory.Padic.Classes
-import Data.Ratio
+import Math.NumberTheory.Padic.Fixed.Integer
+import Math.NumberTheory.Padic.Fixed.Rational
 
--- |  Integer p-adic number (an element of \(\mathbb{Z}_p\)).
-type Z p = Padic Integer p 0
--- |  Integer p-adic number with explicitly specified precision.
-type Z' p prec = Padic Fixed p prec
--- |  Rational p-adic number (an element of \(\mathbb{Q}_p\)).
-type Q p = Padic (Ratio Integer) p 0
--- |  Rational p-adic number with explicitly specified precision.
-type Q' p prec = Padic (Ratio Fixed) p prec

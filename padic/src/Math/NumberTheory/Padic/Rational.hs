@@ -18,14 +18,13 @@ import Math.NumberTheory.Padic.Classes
 import Math.NumberTheory.Padic.Integer
 
 ------------------------------------------------------------
-
-type instance Padic (Ratio Free) p prec = Q p prec
-type instance Padic (Ratio Integer) p _ = Q p (SufficientPrecision Word32 p)
+-- |  Rational p-adic number (an element of \(\mathbb{Q}_p\)) with default 20-digit precision.
+type Q p = Q' p 20
   
 -- |  Rational p-adic number with explicitly specified precision.
-newtype Q (p :: Nat) (prec :: Nat) = Q (Z p prec, Int)
+newtype Q' (p :: Nat) (prec :: Nat) = Q' (Z' p prec, Int)
 
-instance Radix p prec => Show (Q p prec) where
+instance Radix p prec => Show (Q' p prec) where
   show n = si ++ sep ++ "." ++ sep ++ sf
     where
       k = valuation n
@@ -55,32 +54,32 @@ instance Radix p prec => Show (Q p prec) where
         | radix n < 11 = ""
         | otherwise = " "
     
-instance Radix p prec => PadicNum (Q p prec) where
-  type Unit (Q p prec) = Z p prec
-  type Lifted (Q p prec) = Lifted (Z p prec)
-  type Digit (Q p prec) = Digit (Z p prec)
+instance Radix p prec => PadicNum (Q' p prec) where
+  type Unit (Q' p prec) = Z' p prec
+  type Lifted (Q' p prec) = Lifted (Z' p prec)
+  type Digit (Q' p prec) = Digit (Z' p prec)
 
   {-# INLINE precision #-}
   precision = fromIntegral . natVal
 
   {-# INLINE  radix #-}
-  radix (Q (u, _)) = radix u
+  radix (Q' (u, _)) = radix u
 
   {-# INLINE digits #-}
-  digits (Q (u, v)) = replicate v 0 ++ digits u
+  digits (Q' (u, v)) = replicate v 0 ++ digits u
 
   {-# INLINE fromDigits #-}
-  fromDigits ds = Q (fromDigits ds, 0)
+  fromDigits ds = Q' (fromDigits ds, 0)
 
   {-# INLINE lifted #-}
-  lifted (Q (u, _)) = lifted u
+  lifted (Q' (u, _)) = lifted u
 
   {-# INLINE mkUnit #-}
-  mkUnit ds = Q (mkUnit ds, 0)
+  mkUnit ds = Q' (mkUnit ds, 0)
 
-  fromUnit = Q
+  fromUnit = Q'
 
-  splitUnit n@(Q (u, v)) =
+  splitUnit n@(Q' (u, v)) =
     let pr = precision n
         (u', v') = splitUnit u
     in if v + v' > pr then (0, pr) else (u', v + v')     
@@ -91,7 +90,7 @@ instance Radix p prec => PadicNum (Q p prec) where
                  return $ fromUnit (r, - valuation n)
 
 
-instance Radix p prec => Eq (Q p prec) where
+instance Radix p prec => Eq (Q' p prec) where
   a' == b' =
     (isZero a && isZero b)
     || (valuation a == valuation b && unit a == unit b)
@@ -99,36 +98,36 @@ instance Radix p prec => Eq (Q p prec) where
       a = normalize a'
       b = normalize b'
 
-instance Radix p prec => Ord (Q p prec) where
+instance Radix p prec => Ord (Q' p prec) where
   compare = error "Order is nor defined for p-adics."
 
-instance Radix p prec => Num (Q p prec) where
-  fromInteger n = normalize $ Q (fromInteger n, 0)
+instance Radix p prec => Num (Q' p prec) where
+  fromInteger n = normalize $ Q' (fromInteger n, 0)
           
-  x@(Q (a, va)) + Q (b, vb) =
+  x@(Q' (a, va)) + Q' (b, vb) =
     case compare va vb of
-      LT -> Q (a + p ^ (vb - va) * b, va)
-      EQ -> Q (a + b, va)
-      GT -> Q (p ^ (va - vb) * a + b, vb)
+      LT -> Q' (a + p ^ (vb - va) * b, va)
+      EQ -> Q' (a + b, va)
+      GT -> Q' (p ^ (va - vb) * a + b, vb)
     where
       p = fromInteger (radix x)
       
-  Q (a, va) * Q (b, vb) = Q (a * b, va + vb)
+  Q' (a, va) * Q' (b, vb) = Q' (a * b, va + vb)
       
-  negate (Q (u, v)) = Q (negate u, v)
+  negate (Q' (u, v)) = Q' (negate u, v)
   abs = id
   signum 0 = 0
   signum _ = 1
 
-instance Radix p prec => Fractional (Q p prec) where
+instance Radix p prec => Fractional (Q' p prec) where
   fromRational 0 = 0
   fromRational x = res
     where
-      res = Q (n `div` d, v)
+      res = Q' (n `div` d, v)
       p = radix res
       (q, v) = getUnitQ p x
       (n, d) = (fromInteger $ numerator q, fromInteger $ denominator q)
-  a / b = Q (res, valuation a - valuation b')
+  a / b = Q' (res, valuation a - valuation b')
     where
       b' = normalize b
       res
@@ -136,18 +135,9 @@ instance Radix p prec => Fractional (Q p prec) where
         | otherwise = 
           error $ show b' ++ " is indivisible in " ++ show (radix a) ++ "-adics!"
 
-instance Radix p prec => Real (Q p prec) where
+instance Radix p prec => Real (Q' p prec) where
   toRational n = toRational (unit n) / norm n
 
-pExp x | fromRational (norm x) < p ** (-1/(p-1)) = error "eExp does not converge!"
-       | otherwise = go 1000 0 1 1
-  where
-    p = fromIntegral (radix x)
-    go n s t i
-      | n <= 0 = s -- error "eExp failed to converge within precision!"
-      | valuation t' > precision x = s
-      | otherwise = go (n - 1) (s + t) t' (i+1)
-      where t' = t*x/i
 
 
 {-

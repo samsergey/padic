@@ -43,29 +43,6 @@ type family Radix p prec :: Constraint where
     , KnownRadix (LiftedRadix p prec)
     )
 
-type family SufficientPrecision t p :: Nat where
-  SufficientPrecision Word32 2 = 31
-  SufficientPrecision Word32 3 = 20
-  SufficientPrecision Word32 5 = 13
-  SufficientPrecision Word32 6 = 12
-  SufficientPrecision Word32 7 = 11
-  SufficientPrecision Word32 10 = 9
-  SufficientPrecision Int 2 = 63
-  SufficientPrecision Int 3 = 40
-  SufficientPrecision Int 5 = 27
-  SufficientPrecision Int 6 = 24
-  SufficientPrecision Int 7 = 22
-  SufficientPrecision Int 10 = 19
-  SufficientPrecision Word p = 1 + SufficientPrecision Int p
-  SufficientPrecision (Ratio t) p = SufficientPrecision t p
-  SufficientPrecision t p = Div (SufficientPrecision t 2) (Log2 p)
-
--- | Type for p-adic number representing numeric type @num@ with radix @p@.
-type family Padic num (p :: Nat) (prec :: Nat)
-
-data Fixed
-data Free
-
 ------------------------------------------------------------
 -- | Typeclass for p-adic numbers objects
 class Num n => PadicNum n where
@@ -305,7 +282,7 @@ Examples:
 20
 -}
 sufficientPrecision :: (Integral a) => Integer -> a -> Integer
-sufficientPrecision p m = ilog p (2 * fromIntegral m) + 1
+sufficientPrecision p m = ilog p (2 * fromIntegral m) + 2
 
   
 {- | Returns p-adic solution of the equation \(f(x) = 0\) by Hensel lifting solutions of \(f(x) = 0\ \mathrm{mod}\ p\).
@@ -380,3 +357,29 @@ tortoiseHare l x =
   filter (\(_, (a, b)) -> concat (replicate 3 a) == b) $
   zip (inits x) $
   zipWith splitAt [1 .. l] $ zipWith take [4, 8 ..] $ tails x
+
+------------------------------------------------------------
+
+
+pExp :: (PadicNum n, Fractional n) => n -> Either String n
+pExp x | fromRational (norm x) > p ** (-1/(p-1)) = Left "eExp does not converge!"
+       | otherwise = go (2 * precision x) 0 1 1
+  where
+    p = fromIntegral (radix x)
+    go n s t i
+      | n <= 0 = Left "eExp failed to converge within precision!"
+      | valuation t >= precision x = Right s
+      | otherwise = go (n - 1) (s + t) (t*x/i) (i+1)
+
+pLog :: (PadicNum b, Fractional b) => b -> Either String b
+pLog x' = f (x' - 1)
+  where
+    pr = precision x'
+    f x | fromRational (norm x) > 1 = Left "pLog does not converge!"
+        | otherwise = go (10 * pr) 0 x 1 (cycle [(+),(-)])
+      where
+        go n s t i (o:os)
+          | n <= 0 = Left "eLog failed to converge within precision!"
+          | valuation t >= pr = Right s
+          | otherwise = go (n - 1) (s `o` t/i) (t*x) (i+1) os
+
