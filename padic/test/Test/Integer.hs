@@ -47,11 +47,11 @@ showTests = testGroup "String representation"
   , testCase "123" $ show (123 :: Z 2) @?= "1111011"
   , testCase "123456789" $ show (123456789 :: Z' 10 5) @?= "…56789"
   , testCase "-123" $ show (-123 :: Z 10) @?= "(9)877"
-  , testCase "1/23" $ show (1 `div` 23 :: Z 10) @?= "…65217391304347826087"
-  , testCase "1/23" $ show (1 `div` 23 :: Z' 10 40) @?= "(6956521739130434782608)7"
+  , testCase "1/23" $ show (1 `div` 23 :: Z 10) @?= "…565217391304347826087"
   , testCase "1/23" $ show (1 `div` 23 :: Z' 17 5) @?= "… 8 14 13 5 3"
   , testCase "123456" $ show (123456 :: Z' 257 4) @?= "1 223 96"
-  , testCase "123456" $ show (-123456 :: Z' 257 6) @?= "(256) 255 33 161"
+  , testCase "123456" $ show (-12345 :: Z 257) @?= "(256) 208 248"
+  , testCase "123456" $ show (-123456 :: Z 257) @?= "… 256 256 256 256 256 255 33 161"
   ]
 
 ------------------------------------------------------------
@@ -95,7 +95,7 @@ divMulZ t a b = isInvertible b ==> b * (a `div` b) === a
 ------------------------------------------------------------
 pAdicUnitTests :: TestTree
 pAdicUnitTests = testGroup "p-adic units."
-  [ testCase "13" $ splitUnit (0 :: Z 2) @?= (0, 20)
+  [ testCase "13" $ splitUnit (0 :: Z 2) @?= (0, 64)
   , testCase "14" $ splitUnit (1 :: Z 2) @?= (1, 0)
   , testCase "15" $ splitUnit (100 :: Z 2) @?= (25, 2)
   , testCase "16" $ splitUnit (4 `div` 15 :: Z 2) @?= (1 `div` 15, 2)

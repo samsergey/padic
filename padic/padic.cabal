@@ -26,10 +26,7 @@ source-repository head
 library
   exposed-modules:
       Math.NumberTheory.Padic
-      Math.NumberTheory.Padic.Classes
-      Math.NumberTheory.Padic.Fixed
-      Math.NumberTheory.Padic.Fixed.Integer
-      Math.NumberTheory.Padic.Fixed.Rational
+      Math.NumberTheory.Padic.Commons
       Math.NumberTheory.Padic.Integer
       Math.NumberTheory.Padic.Rational
   other-modules:
@@ -54,11 +51,8 @@ test-suite padic-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
-      FixedSpec
       Test.Base
       Test.Commons
-      Test.FixedInteger
-      Test.FixedRational
       Test.Integer
       Test.Rational
       Paths_padic

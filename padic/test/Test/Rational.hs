@@ -60,11 +60,10 @@ showTests = testGroup "String representation"
   , testCase "1/15" $ show (1/15 :: Q 3) @?= "(1210).2"
   , testCase "1/700" $ show (1/700 :: Q 10) @?= "(428571).43"
   , testCase "100/7" $ show (100/7 :: Q 10) @?= "(285714)300.0"
-  , testCase "1/23" $ show (1/23 :: Q 10) @?= "…65217391304347826087.0"
-  , testCase "1/23" $ show (1/23 :: Q' 10 40) @?= "(6956521739130434782608)7.0"
+  , testCase "1/23" $ show (1/23 :: Q 10) @?= "…565217391304347826087.0"
   , testCase "1/23" $ show (1/23 :: Q' 17 5) @?= "… 8 14 13 5 3 . 0"
   , testCase "123456" $ show (123456 :: Q' 257 4) @?= "1 223 96 . 0"
-  , testCase "123456" $ show (-123456 :: Q' 257 6) @?= "(256) 255 33 161 . 0"
+  , testCase "123456" $ show (-123456 :: Q' 257 6) @?= "… 256 256 256 255 33 161 . 0"
   ]
 
 ringIsoQ ::
@@ -94,7 +93,7 @@ psi :: (Fractional n, Real n) => n -> SmallRational
 psi = SmallRational . toRational 
 
 ringIsoQTests = testGroup "Ring isomorphism"
-  [ ringIsoQ "Q 2" (0 :: Q' 2 67)
+  [ ringIsoQ "Q 2" (0 :: Q' 2 68)
   , ringIsoQ "Q 3" (0 :: Q' 3 45)
   , ringIsoQ "Q 5" (0 :: Q' 5 29)
   , ringIsoQ "Q 7" (0 :: Q' 7 26)

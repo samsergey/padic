@@ -1,15 +1,13 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Test.Commons (testSuite) where
 
-import Math.NumberTheory.Padic.Classes
+import Math.NumberTheory.Padic.Commons
 import GHC.TypeLits hiding (Mod)
 import Test.Tasty
 import Test.Tasty.HUnit
