@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {- |
 Module      : Math.NumberTheory.Padic.Fixed
 Description : Representation and simple algebra for p-adic numbers with fixed precision.
@@ -45,6 +46,7 @@ module Math.NumberTheory.Padic.Fixed
   -- * Classes and functions
   -- ** p-adic numbers
     Padic
+  , PadicNum
   , Unit
   , Digit
   , Lifted
@@ -86,6 +88,13 @@ module Math.NumberTheory.Padic.Fixed
   , henselLifting ) where
 
 import Math.NumberTheory.Padic.Classes
-import Math.NumberTheory.Padic.Fixed.Integer
-import Math.NumberTheory.Padic.Fixed.Rational
+import Data.Ratio
 
+-- |  Integer p-adic number (an element of \(\mathbb{Z}_p\)).
+type Z p = Padic Integer p 0
+-- |  Integer p-adic number with explicitly specified precision.
+type Z' p prec = Padic Fixed p prec
+-- |  Rational p-adic number (an element of \(\mathbb{Q}_p\)).
+type Q p = Padic (Ratio Integer) p 0
+-- |  Rational p-adic number with explicitly specified precision.
+type Q' p prec = Padic (Ratio Fixed) p prec

@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_HADDOCK hide, prune, ignore-exports #-}
 
 {-# LANGUAGE ConstraintKinds #-}
@@ -11,9 +12,10 @@
 module Math.NumberTheory.Padic.Classes  where
 
 import Data.Ratio
-import Data.List (unfoldr, genericLength)
+import Data.List (unfoldr, genericLength, tails, inits,find)
 import Data.Maybe (isJust, maybeToList)
 import Data.Mod  
+import Data.Word  
 import GHC.TypeLits hiding (Mod)
 import Data.Constraint (Constraint)
 import GHC.Integer (smallInteger)
@@ -41,9 +43,32 @@ type family Radix p prec :: Constraint where
     , KnownRadix (LiftedRadix p prec)
     )
 
+type family SufficientPrecision t p :: Nat where
+  SufficientPrecision Word32 2 = 31
+  SufficientPrecision Word32 3 = 20
+  SufficientPrecision Word32 5 = 13
+  SufficientPrecision Word32 6 = 12
+  SufficientPrecision Word32 7 = 11
+  SufficientPrecision Word32 10 = 9
+  SufficientPrecision Int 2 = 63
+  SufficientPrecision Int 3 = 40
+  SufficientPrecision Int 5 = 27
+  SufficientPrecision Int 6 = 24
+  SufficientPrecision Int 7 = 22
+  SufficientPrecision Int 10 = 19
+  SufficientPrecision Word p = 1 + SufficientPrecision Int p
+  SufficientPrecision (Ratio t) p = SufficientPrecision t p
+  SufficientPrecision t p = Div (SufficientPrecision t 2) (Log2 p)
+
+-- | Type for p-adic number representing numeric type @num@ with radix @p@.
+type family Padic num (p :: Nat) (prec :: Nat)
+
+data Fixed
+data Free
+
 ------------------------------------------------------------
--- | Typeclass for digitally representable objects
-class Padic n where
+-- | Typeclass for p-adic numbers objects
+class Num n => PadicNum n where
   -- | A type for p-adic unit.
   type Unit n
   -- | A type for digits of p-adic expansion.
@@ -124,7 +149,7 @@ Examples:
 12
 >>> unit (75 :: Z 5)
 3 -}
-unit :: Padic n => n -> Unit n
+unit :: PadicNum n => n -> Unit n
 {-# INLINE unit #-}
 unit = fst . splitUnit
 
@@ -143,7 +168,7 @@ Valuation of zero is equal to working precision
 20
 >>> valuation (0 :: Q' 2 150)
 150 -}
-valuation :: Padic n => n -> Int
+valuation :: PadicNum n => n -> Int
 {-# INLINE valuation #-}
 valuation = snd . splitUnit
 
@@ -155,16 +180,31 @@ valuation = snd . splitUnit
 -- 0.1
 -- >>> norm (75 :: Z 5)
 -- 4.0e-2
-norm :: (Integral i, Padic n) => n -> Ratio i
+norm :: (Integral i, PadicNum n) => n -> Ratio i
 {-# INLINE norm #-}
 norm n = (radix n % 1) ^^ (-valuation n)
 
+{- | Adjusts unit and valuation of p-adic number, by removing trailing zeros from the right-side of the unit.
+
+Examples:
+
+>>> λ> x = 2313 + 1387 :: Q 10
+>>> x
+3700.0
+>>> splitUnit x
+(3700,0)
+>>> splitUnit (normalize x)
+(37,2) -}
+normalize :: (PadicNum n) => n -> n
+normalize x = fromUnit $ splitUnit x
+
+
 -- | Returns @True@ for a p-adic number which is equal to zero (within it's precision).
-isZero :: Padic n => n -> Bool
+isZero :: PadicNum n => n -> Bool
 {-# INLINE isZero #-}
 isZero n = valuation n >= precision n
 
-instance KnownRadix p => Padic (Mod p) where
+instance KnownRadix p => PadicNum (Mod p) where
   type Unit (Mod p) = Mod p
   type Lifted (Mod p) = Integer
   type Digit (Mod p) = Mod p
@@ -248,7 +288,7 @@ getUnitQ p x = (c, genericLength v2 - genericLength v1)
     (v2, c:_) =
       span (\n -> numerator n `mod` p == 0) $ iterate (/ fromIntegral p) b
 
-liftedRadix :: (Padic n, Integral a) => n -> a
+liftedRadix :: (PadicNum n, Integral a) => n -> a
 {-# INLINE liftedRadix #-}
 liftedRadix n = radix n ^ (2*precision n + 1)
 
@@ -278,7 +318,7 @@ Examples:
 [0,1,…92256259918212890625,…07743740081787109376]
 -}
 henselLifting ::
-     (Eq n, Num n, Padic n, KnownRadix p, Digit n ~ Mod p)
+     (Eq n, PadicNum n, KnownRadix p, Digit n ~ Mod p)
   => (n -> n) -- ^ Function to be vanished.
   -> (n -> n) -- ^ Derivative of the function.
   -> [n] -- ^ The result.
@@ -297,7 +337,7 @@ henselLifting f f' = res
 >>> findSolutionMod (\x -> x*x - x) :: [Q 10]
 [0.0,1.0,5.0,6.0]
 -}
-findSolutionMod :: (Padic n, KnownRadix p, Digit n ~ Mod p)
+findSolutionMod :: (PadicNum n, KnownRadix p, Digit n ~ Mod p)
                 => (n -> n) -> [n]
 findSolutionMod f = [ fromMod d | d <- [0..], fm d == 0 ]
   where
@@ -312,3 +352,31 @@ iterateM n f = go n
       y <- f x
       if x == y then pure x else go (i - 1) y
    
+------------------------------------------------------------
+
+-- | For a given list extracts prefix and a cycle, limiting length of prefix and cycle by @len@.
+-- Uses the modified tortiose and hare method.
+findCycle :: Eq a => Int -> [a] -> Maybe ([a], [a])
+findCycle len lst =
+  find test [ rollback (a, c)
+            | (a, cs) <- tortoiseHare len lst
+            , c <- take 1 [ c | c <- tail (inits cs)
+                              , and $ zipWith (==) cs (cycle c) ] ]
+  where
+    rollback (as, bs) = go (reverse as, reverse bs)
+      where
+        go =
+          \case
+            ([], ys) -> ([], reverse ys)
+            (x:xs, y:ys)
+              | x == y -> go (xs, ys ++ [x])
+            (xs, ys) -> (reverse xs, reverse ys)
+    test (_, []) = False
+    test (pref, c) = and $ zipWith (==) (take len lst) (pref ++ cycle c)
+
+tortoiseHare :: Eq a => Int -> [a] -> [([a], [a])]
+tortoiseHare l x =
+  map (fmap fst) $
+  filter (\(_, (a, b)) -> concat (replicate 3 a) == b) $
+  zip (inits x) $
+  zipWith splitAt [1 .. l] $ zipWith take [4, 8 ..] $ tails x

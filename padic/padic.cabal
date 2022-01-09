@@ -54,7 +54,11 @@ test-suite padic-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
-      FixedSpec
+      Test.Base
+      Test.Integer
+      Test.FixedInteger
+      Test.Rational
+      Test.Commons
       Paths_padic
   hs-source-dirs:
       test
