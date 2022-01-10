@@ -12,14 +12,35 @@ Module introduces p-adic integers \(\mathbb{Z}_p\) and p-adic rational numbers \
  and implements basic arithmetic as well as some specific functions,
 i.e. rational reconstruction, computation of square roots etc.
 
+A truncated p-adic number \(x\) can be represented in three ways:
+
+\[
+x = p^v u = d_0 + d_1 p + d_2 p^2 + ... d_k p^k = N\ \mathrm{mod}\ p^k,\\
+p > 1, k > 0, v \in \mathbb{Z},\\
+u \in \mathbb{Z_p}\\
+d_i \in \mathbb{Z}/p\mathbb{Z}\\
+N \in  \mathbb{Z}/p^k \mathbb{Z}\\
+\]
+
 In order to gain efficiency the integer p-adic number with radix \(p\) is internally
-represented as only one digit /lifted/ to modulo \(p^k\), where \(k\) is
+represented as only one digit \(N\), lifted to modulo \(p^k\), where \(k\) is
 chosen so that within working precision numbers belogning to @Int@ and @Ratio Int@ types could be
 reconstructed by extended Euclidean method. 
 
-The radix \(p\) of a p-adic number is specified at a type level via type-literals. In order to use them GHCi should be loaded with a couple of extensions.
+The documentation and the module use following terminology:
 
->>> :set -XDataKinds -XTypeOperators
+  * `radix` -- modulus \(p\)
+  * `precision` -- maximal power \(k\) in p-adic expansion.
+  * `unit` -- invertible muliplier \(u\) for prime \(p\)
+  * `valuation` -- exponent \(v\)
+  * `digits` -- list \(d_0,d_1,d_2,... d_k\) in the p-adic expansion of a number
+  * `lifted` -- digit \(N\) lifted to modulo \(p^k\).
+
+Rational p-adic number is represented as a tuple, containing a unit (belonging to \(\mathbb{Z_p}\) ) and valuation, which may be negative.
+
+The radix \(p\) of a p-adic number is specified at a type level via type-literals. In order to use them GHCi should be loaded with `-XDataKinds` extensions.
+
+>>> :set -XDataKinds
 >>> 45 :: Z 10
 45
 >>> 45 :: Q 5
@@ -32,7 +53,7 @@ Negative p-adic integers and rational p-adics have trailing periodic digit seque
 >>> 1/7 :: Q 10
 (285714)3.0
 
-By default the precision of p-adics is computed so that it makes possible to reconstruct integers and rationals using extended Euler's method. However precision could be specified explicitly via type-literal:
+By default the precision of p-adics is computed so that it is possible to reconstruct integers and rationals using extended Euler's method. However precision could be specified explicitly via type-literal:
 
 >>> sqrt 2 :: Q 7
 …623164112011266421216213.0
@@ -40,6 +61,7 @@ By default the precision of p-adics is computed so that it makes possible to rec
 …16213.0
 >>> sqrt 2 :: Q' 7 50
 …16244246442640361054365536623164112011266421216213.0
+
 -}
 ------------------------------------------------------------
 module Math.NumberTheory.Padic

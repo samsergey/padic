@@ -26,7 +26,7 @@ type instance Padic (Ratio Word64) p = Q' p (SufficientPrecision Word64 p)
 type instance Padic (Ratio Word) p = Q' p (SufficientPrecision Word64 p)
 
 ------------------------------------------------------------
--- |  Rational p-adic number (an element of \(\mathbb{Q}_p\)) with default 20-digits precision.
+-- |  Rational p-adic number (an element of \(\mathbb{Q}_p\)) with default precision.
 type Q p = Q' p (SufficientPrecision Word32 p)
 
 -- |  Rational p-adic number with explicitly specified precision.

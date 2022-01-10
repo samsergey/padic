@@ -28,7 +28,7 @@ type instance Padic Word64 p = Z' p (SufficientPrecision Word64 p)
 type instance Padic Word p = Z' p (SufficientPrecision Word64 p)
 
 
--- |  Integer p-adic number (an element of \(\mathbb{Z}_p\)) with default 20-digit precision.
+-- |  Integer p-adic number (an element of \(\mathbb{Z}_p\)) with default precision.
 type Z p = Z' p (SufficientPrecision Word32 p)
 
 -- |  Integer p-adic number with explicitly specified precision.

@@ -76,14 +76,16 @@ type family SufficientPrecision num (p :: Nat) :: Nat where
 123456
 >>> toRational (12345678987654321 :: Padic (Ratio Word16) 3)
 537143292837 % 5612526479  -- insufficiend precision for proper reconstruction!!
-λ> toRational (12345678987654321 :: Padic Rational 3)
+>>> toRational (12345678987654321 :: Padic Rational 3)
 12345678987654321 % 1
 
 -}
 type family Padic num (p :: Nat)
 
 ------------------------------------------------------------
--- | Typeclass for p-adic numbers 
+{- | Typeclass for p-adic numbers.
+
+-}
 class (Eq n, Num n) => PadicNum n where
   -- | A type for p-adic unit.
   type Unit n
@@ -117,21 +119,23 @@ class (Eq n, Num n) => PadicNum n where
   --
   -- Examples:
   --
-  -- >>> take 5 $ digits (123 :: Z 10)
+  -- >>> digits (123 :: Z 10)
   -- [(3 `modulo` 10),(2 `modulo` 10),(1 `modulo` 10),(0 `modulo` 10),(0 `modulo` 10)]
   -- >>> take 5 $ digits (-123 :: Z 2)
   -- [(1 `modulo` 2),(0 `modulo` 2),(1 `modulo` 2),(0 `modulo` 2),(0 `modulo` 2)]
-  -- >>> take 5 $ digits (1/200 :: Q 10)
-  -- [(1 `modulo` 2),(0 `modulo` 2),(1 `modulo` 2),(0 `modulo` 2),(0 `modulo` 2)]
+  -- >>> take 5 $ digits (1/300 :: Q 10)
+  -- [(7 `modulo` 10),(6 `modulo` 10),(6 `modulo` 10),(6 `modulo` 10),(6 `modulo` 10)]
+  --
   digits :: n -> [Digit n]
   -- | Returns lifted digits
   --
   -- Examples:
   --
-  -- >>> take 3 $ lifted (123 :: Z 10)
-  -- [(123 `modulo` 10000000000000000000),(0 `modulo` 10000000000000000000),(0 `modulo` 10000000000000000000)]
-  -- >>> take 3 $ lifted (-123 :: Z 2)
-  -- [(9223372036854775685 `modulo` 9223372036854775808),(9223372036854775807 `modulo` 9223372036854775808),(9223372036854775807 `modulo` 9223372036854775808)]
+  -- >>> lifted (123 :: Z 10)
+  -- 123
+  -- >>> lifted (-123 :: Z 10)
+  -- 9999999999999999999999999999999999999999877
+  --
   lifted :: n -> Lifted n
 
   -- | Creates digital object from it's lifted digits.
@@ -153,13 +157,13 @@ class (Eq n, Num n) => PadicNum n where
   inverse :: n -> Maybe n
   
 
--- | The least significant digit of a p-adic number.
+{- | The least significant digit of a p-adic number.
 --
 -- >>> firstDigit (123 :: Z 10)
 -- (3 `modulo` 10)
 -- >>> firstDigit (123 :: Z 257)
 -- (123 `modulo` 257)
---
+-}
 {-# INLINE firstDigit #-}
 firstDigit n = head (digits n)
 
