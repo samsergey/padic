@@ -15,7 +15,7 @@ import Data.Word
 import Data.Ratio
 import GHC.TypeLits (Nat, natVal)
 import GHC.Integer.GMP.Internals (recipModInteger)
-import Math.NumberTheory.Padic.Commons
+import Math.NumberTheory.Padic.Types
 
 ------------------------------------------------------------
 

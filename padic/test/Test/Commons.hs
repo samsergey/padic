@@ -7,7 +7,7 @@
 
 module Test.Commons (testSuite) where
 
-import Math.NumberTheory.Padic.Commons
+import Math.NumberTheory.Padic
 import GHC.TypeLits hiding (Mod)
 import Test.Tasty
 import Test.Tasty.HUnit

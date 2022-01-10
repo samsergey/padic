@@ -11,7 +11,8 @@ import Data.Ratio
 import Data.Mod
 import Data.Word
 import GHC.TypeLits (Nat, natVal)
-import Math.NumberTheory.Padic.Commons
+import Math.NumberTheory.Padic.Types
+import Math.NumberTheory.Padic.Analysis
 import Math.NumberTheory.Padic.Integer
 
 ------------------------------------------------------------
@@ -150,32 +151,24 @@ instance Radix p prec => Real (Q' p prec) where
 
 pUndefinedError s = error $ s ++ " is undifined for p-adics."
 
+fromEither = either error id
+
 instance Radix p prec => Floating (Q' p prec) where
-  pi = pUndefinedError "pi"
+  x ** y = fromEither $ pPow x y
+  exp = fromEither . pExp
+  log = fromEither . pLog
+  sinh = fromEither . pSinh
+  cosh = fromEither . pCosh
+  sin = fromEither . pSin
+  cos = fromEither . pCos
+  asinh = fromEither . pAsinh
+  acosh = fromEither . pCosh
+  atanh = fromEither . pTanh
+  asin = fromEither . pAsin
   sqrt x = case pSqrt x of
-    Right res -> res
-    Left m -> error m
-  x ** y = case pLog x >>= \z -> pExp (z*x) of
-      Right res -> res
-      Left m -> error "exponentiation doesn't converge!"
-  exp x = case pExp x of
-    Right res -> res
-    Left m -> error m
-  log x = case pLog x of
-    Right res -> res
-    Left m -> error m
-  sinh x = case pSinh x of
-    Right res -> res
-    Left m -> error m
-  cosh x = case pCosh x of
-    Right res -> res
-    Left m -> error m
-  sin x = case pSin x of
-    Right res -> res
-    Left m -> error m
-  cos x = case pCos x of
-    Right res -> res
-    Left m -> error m 
-  asinh x = log (x + sqrt (x*x + 1))
-  acosh x = log (x + sqrt (x*x - 1))
-  atanh x = 1/2 * log ((x+1)/(x-1))
+    res:_ -> res
+    [] -> error $ "sqrt: digit " ++ show (firstDigit x) ++ " is not a square residue!"
+  pi = pUndefinedError "pi"
+  acos = pUndefinedError "acos"
+  atan = pUndefinedError "atan"
+

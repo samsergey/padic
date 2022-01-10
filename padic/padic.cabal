@@ -26,9 +26,10 @@ source-repository head
 library
   exposed-modules:
       Math.NumberTheory.Padic
-      Math.NumberTheory.Padic.Commons
+      Math.NumberTheory.Padic.Analysis
       Math.NumberTheory.Padic.Integer
       Math.NumberTheory.Padic.Rational
+      Math.NumberTheory.Padic.Types
   other-modules:
       Paths_padic
   hs-source-dirs:

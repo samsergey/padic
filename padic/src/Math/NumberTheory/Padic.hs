@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {- |
 Module      : Math.NumberTheory.Padic.Fixed
-Description : Representation and simple algebra for p-adic numbers with fixed precision.
+Description : Representation and simple algebra for p-adic numbers.
 Copyright   : (c) Sergey Samoylenko, 2022
 License     : GPL-3
 Maintainer  : samsergey@yandex.ru
@@ -9,7 +9,7 @@ Stability   : experimental
 Portability : POSIX
 
 Module introduces p-adic integers \(\mathbb{Z}_p\) and p-adic rational numbers \(\mathbb{Q}_p\)
-with fixed precision, implementing basic arithmetic as well as some specific functions,
+ and implements basic arithmetic as well as some specific functions,
 i.e. rational reconstruction, computation of square roots etc.
 
 In order to gain efficiency the integer p-adic number with radix \(p\) is internally
@@ -32,13 +32,14 @@ Negative p-adic integers and rational p-adics have trailing periodic digit seque
 >>> 1/7 :: Q 10
 (285714)3.0
 
-By default the precision of p-adics is computed so that it makes possible to reconstruct integers and rationals using extended Euler's method (as given in ...). However precision could be specified explicitly via type-literal:
+By default the precision of p-adics is computed so that it makes possible to reconstruct integers and rationals using extended Euler's method. However precision could be specified explicitly via type-literal:
 
->>> -45 :: Z' 10 5
-…99955
->>> 1 / 175 :: Q' 7 50
-…50165016501650165016501650165016501650165016501650.2
-
+>>> sqrt 2 :: Q 7
+…623164112011266421216213.0
+>>> sqrt 2 :: Q' 7 5
+…16213.0
+>>> sqrt 2 :: Q' 7 50
+…16244246442640361054365536623164112011266421216213.0
 -}
 ------------------------------------------------------------
 module Math.NumberTheory.Padic
@@ -51,8 +52,9 @@ module Math.NumberTheory.Padic
   , Q
   , Q'
   , Padic
+  , SufficientPrecision
   -- * Classes and functions
-  -- ** Type synonyms and constraints
+ -- ** Type synonyms and constraints
   , ValidRadix
   , KnownRadix
   , LiftedRadix
@@ -62,6 +64,8 @@ module Math.NumberTheory.Padic
   , Unit
   , Digit
   , Lifted
+  -- * Functions and utilities
+  -- ** p-adic numbers and arithmetics
   , radix
   , precision
   , digits
@@ -78,22 +82,35 @@ module Math.NumberTheory.Padic
   , inverse
   , isInvertible
   , isZero
-  -- * Functions and utilities
+  , getUnitZ
+  , getUnitQ
+  -- ** p-adic analysis
   , findSolutionMod
   , henselLifting
+  , pSqrt
+  , pPow
   , pExp
   , pLog
+  , pSin
+  , pCos
+  , pSinh
+  , pCosh
+  , pTanh
+  , pAsin
+  , pAsinh
+  , pAcosh
+  , pAtanh
+  -- ** Miscelleneos tools
   , fromRadix
   , toRadix
   , findCycle
   , sufficientPrecision
-  , getUnitZ
-  , getUnitQ
   ) where
 
-import Math.NumberTheory.Padic.Commons
+import Math.NumberTheory.Padic.Types
 import Math.NumberTheory.Padic.Integer
 import Math.NumberTheory.Padic.Rational
+import Math.NumberTheory.Padic.Analysis
 import Data.Word
 import Data.Ratio
 
