@@ -25,14 +25,14 @@ The radix \(p\) of a p-adic number is specified at a type level via type-literal
 >>> 45 :: Q 5
 140.0
 
-By default the precision of p-adics is bounded by 20 digits.
+Negative p-adic integers and rational p-adics have trailing periodic digit sequences, which are represented in parentheses.
 
->>>  -45 :: Z 10
-…9999999999999999955
->>> 1 / 15 :: Q 3
-…12101210121012101210.2
+>>> -45 :: Z 7
+(6)04
+>>> 1/7 :: Q 10
+(285714)3.0
 
-However precision could be specified explicitly:
+By default the precision of p-adics is computed so that it makes possible to reconstruct integers and rationals using extended Euler's method (as given in ...). However precision could be specified explicitly via type-literal:
 
 >>> -45 :: Z' 10 5
 …99955
@@ -50,6 +50,7 @@ module Math.NumberTheory.Padic
   -- ** p-Adic rationals
   , Q
   , Q'
+  , Padic
   -- * Classes and functions
   -- ** Type synonyms and constraints
   , ValidRadix
@@ -78,15 +79,21 @@ module Math.NumberTheory.Padic
   , isInvertible
   , isZero
   -- * Functions and utilities
+  , findSolutionMod
+  , henselLifting
+  , pExp
+  , pLog
   , fromRadix
   , toRadix
+  , findCycle
   , sufficientPrecision
   , getUnitZ
   , getUnitQ
-  , findSolutionMod
-  , henselLifting ) where
+  ) where
 
 import Math.NumberTheory.Padic.Commons
 import Math.NumberTheory.Padic.Integer
 import Math.NumberTheory.Padic.Rational
+import Data.Word
+import Data.Ratio
 

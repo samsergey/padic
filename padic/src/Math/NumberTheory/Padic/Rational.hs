@@ -15,8 +15,18 @@ import Math.NumberTheory.Padic.Commons
 import Math.NumberTheory.Padic.Integer
 
 ------------------------------------------------------------
+
+type instance Padic Rational p = Q' p (SufficientPrecision Word p)
+type instance Padic (Ratio Int) p = Q' p (SufficientPrecision Int p)
+type instance Padic (Ratio Word8) p = Q' p (SufficientPrecision Word8 p)
+type instance Padic (Ratio Word16) p = Q' p (SufficientPrecision Word16 p)
+type instance Padic (Ratio Word32) p = Q' p (SufficientPrecision Word32 p)
+type instance Padic (Ratio Word64) p = Q' p (SufficientPrecision Word64 p)
+type instance Padic (Ratio Word) p = Q' p (SufficientPrecision Word64 p)
+
+------------------------------------------------------------
 -- |  Rational p-adic number (an element of \(\mathbb{Q}_p\)) with default 20-digits precision.
-type Q p = Q' p (Sufficientprecision Word32 p)
+type Q p = Q' p (SufficientPrecision Word32 p)
 
 -- |  Rational p-adic number with explicitly specified precision.
 newtype Q' (p :: Nat) (prec :: Nat) = Q' (Z' p prec, Int)
@@ -137,3 +147,35 @@ instance Radix p prec => Fractional (Q' p prec) where
 
 instance Radix p prec => Real (Q' p prec) where
   toRational n = toRational (unit n) / norm n
+
+pUndefinedError s = error $ s ++ " is undifined for p-adics."
+
+instance Radix p prec => Floating (Q' p prec) where
+  pi = pUndefinedError "pi"
+  sqrt x = case pSqrt x of
+    Right res -> res
+    Left m -> error m
+  x ** y = case pLog x >>= \z -> pExp (z*x) of
+      Right res -> res
+      Left m -> error "exponentiation doesn't converge!"
+  exp x = case pExp x of
+    Right res -> res
+    Left m -> error m
+  log x = case pLog x of
+    Right res -> res
+    Left m -> error m
+  sinh x = case pSinh x of
+    Right res -> res
+    Left m -> error m
+  cosh x = case pCosh x of
+    Right res -> res
+    Left m -> error m
+  sin x = case pSin x of
+    Right res -> res
+    Left m -> error m
+  cos x = case pCos x of
+    Right res -> res
+    Left m -> error m 
+  asinh x = log (x + sqrt (x*x + 1))
+  acosh x = log (x + sqrt (x*x - 1))
+  atanh x = 1/2 * log ((x+1)/(x-1))

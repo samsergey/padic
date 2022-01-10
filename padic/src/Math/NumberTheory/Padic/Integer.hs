@@ -19,8 +19,17 @@ import Math.NumberTheory.Padic.Commons
 
 ------------------------------------------------------------
 
+type instance Padic Integer p = Z' p (SufficientPrecision Word p)
+type instance Padic Int p = Z' p (SufficientPrecision Int p)
+type instance Padic Word8 p = Z' p (SufficientPrecision Word8 p)
+type instance Padic Word16 p = Z' p (SufficientPrecision Word16 p)
+type instance Padic Word32 p = Z' p (SufficientPrecision Word32 p)
+type instance Padic Word64 p = Z' p (SufficientPrecision Word64 p)
+type instance Padic Word p = Z' p (SufficientPrecision Word64 p)
+
+
 -- |  Integer p-adic number (an element of \(\mathbb{Z}_p\)) with default 20-digit precision.
-type Z p = Z' p (Sufficientprecision Word32 p)
+type Z p = Z' p (SufficientPrecision Word32 p)
 
 -- |  Integer p-adic number with explicitly specified precision.
 newtype Z' (p :: Nat) (prec :: Nat) = Z' (R prec p)
