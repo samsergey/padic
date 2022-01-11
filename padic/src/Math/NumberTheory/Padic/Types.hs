@@ -1,8 +1,8 @@
 {-# OPTIONS_HADDOCK hide, prune, ignore-exports #-}
 
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE UndecidableSuperClasses #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
@@ -12,7 +12,6 @@
 module Math.NumberTheory.Padic.Types  where
 
 import Data.Ratio
-import Data.List (unfoldr, genericLength, tails, inits,find)
 import Data.Maybe (isJust, maybeToList)
 import Data.Mod  
 import Data.Word  
@@ -57,7 +56,7 @@ Used in a type declaration as follows:
 type family SufficientPrecision num (p :: Nat) :: Nat where
   SufficientPrecision Word32 2 = 64
   SufficientPrecision Word32 3 = 43
-  SufficientPrecision Word32 5 = 29
+  SufficientPrecision Word32 5 = 30
   SufficientPrecision Word32 6 = 26
   SufficientPrecision Word32 7 = 24
   SufficientPrecision Word8 p = Div (SufficientPrecision Word32 p) 4
@@ -92,8 +91,6 @@ class (Eq n, Num n) => PadicNum n where
   -- | A type for digits of p-adic expansion.
   -- Associated type allows to assure that digits will agree with the radix @p@ of the number.
   type Digit n
-  -- | Internal representation of p-adic number.
-  type Lifted n
   -- | Returns the precision of a number.
   --
   -- Examples:
@@ -136,10 +133,10 @@ class (Eq n, Num n) => PadicNum n where
   -- >>> lifted (-123 :: Z 10)
   -- 9999999999999999999999999999999999999999877
   --
-  lifted :: n -> Lifted n
+  lifted :: n -> Integer
 
   -- | Creates digital object from it's lifted digits.
-  mkUnit :: Lifted n -> n
+  mkUnit :: Integer -> n
 
   -- | Creates p-adic number from given unit and valuation.
   --
@@ -164,8 +161,18 @@ class (Eq n, Num n) => PadicNum n where
 -- >>> firstDigit (123 :: Z 257)
 -- (123 `modulo` 257)
 -}
+firstDigit :: PadicNum n => n -> Digit n
 {-# INLINE firstDigit #-}
-firstDigit n = head (digits n)
+firstDigit = head . digits
+
+{- | Returns p-adic number reduced modulo @p@
+
+>>> reduce (123 :: Z 10) :: Mod 100
+(23 `modulo` 100)
+-}
+reduce :: (KnownRadix p, PadicNum n) => n -> Mod p
+reduce = fromIntegral . lifted
+
 
 {- | Returns the p-adic unit of a number
 
@@ -230,76 +237,6 @@ isZero :: PadicNum n => n -> Bool
 {-# INLINE isZero #-}
 isZero n = valuation n >= precision n
 
--- | Unfolds a number to a list of digits (integers modulo @p@).  
-toRadix :: KnownRadix p => Integer -> [Mod p]
-toRadix 0 = [0]
-toRadix n = res
-  where
-    res = unfoldr go n
-    p = fromIntegral $ natVal $ head $ 0 : res
-    go 0 = Nothing
-    go x =
-      let (q, r) = quotRem x p
-       in Just (fromIntegral r, q)
-  
--- | Folds a list of digits (integers modulo @p@) to a number.
-fromRadix :: KnownRadix p => [Mod p] -> Integer
-fromRadix ds = foldr (\x r -> lifted x + r * p) 0 ds
-  where
-    p = fromIntegral $ natVal $ head $ 0 : ds
-
-extEuclid :: Integral i => (Integer, Integer) -> Ratio i
-extEuclid (n, m) = go (m, 0) (n, 1)
-  where
-    go (v1, v2) (w1, w2)
-      | 2*w1*w1 > abs m =
-        let q = v1 `div` w1
-         in go (w1, w2) (v1 - q * w1, v2 - q * w2)
-      | otherwise = fromRational (w1 % w2)
-
-ilog :: (Integral a, Integral b) => a -> a -> b
-ilog a b =
-  fromInteger $ smallInteger (integerLogBase# (fromIntegral a) (fromIntegral b))
-
-{- | Extracts p-adic unit from integer number. For radix \(p\) and integer \(n\) returns
-pair \((u, k)\) such that \(n = u \cdot p^k\).
-
-Examples:
- 
->>> getUnitZ  10 120
-(12,1)
->>> getUnitZ 2 120
-(15,3)
->>> getUnitZ 3 120
-(40,1)
--}
-getUnitZ :: Integer -> Integer -> (Integer, Int)
-getUnitZ _ 0 = (0, 0)
-getUnitZ p x = (b, length v)
-  where
-    (v, b:_) = span (\n -> n `mod` p == 0) $ iterate (`div` p) x
-
-{- | Extracts p-adic unit from a rational number. For radix \(p\) and rational number \(x\) returns
-pair \((r/s, k)\) such that \(x = r/s \cdot p^k\).
-
-Examples:
-
->>> getUnitQ 3 (75/157)
-(1,25 % 157)
->>> getUnitQ 5 (75/157)
-(2,3 % 157)
->>> getUnitQ 157 (75/157)
-(-1,75 % 1)
--}
-getUnitQ :: Integral p => p -> Ratio p -> (Ratio p, Int)
-getUnitQ _ 0 = (0, 0)
-getUnitQ p x = (c, genericLength v2 - genericLength v1)
-  where
-    (v1, b:_) =
-      span (\n -> denominator n `mod` p == 0) $ iterate (* fromIntegral p) x
-    (v2, c:_) =
-      span (\n -> numerator n `mod` p == 0) $ iterate (/ fromIntegral p) b
-
 liftedRadix :: (PadicNum n, Integral a) => n -> a
 {-# INLINE liftedRadix #-}
 liftedRadix n = radix n ^ (2*precision n + 1)
@@ -319,11 +256,15 @@ Examples:
 sufficientPrecision :: Integral a => Integer -> a -> Integer
 sufficientPrecision p m = ilog p (2 * fromIntegral m) + 2
 
+ilog :: (Integral a, Integral b) => a -> a -> b
+ilog a b =
+  fromInteger $ smallInteger (integerLogBase# (fromIntegral a) (fromIntegral b))
+
+
 -----------------------------------------------------------
 
 instance KnownRadix p => PadicNum (Mod p) where
   type Unit (Mod p) = Mod p
-  type Lifted (Mod p) = Integer
   type Digit (Mod p) = Mod p
   radix = fromIntegral . natVal
   precision _ = fromIntegral (maxBound :: Int)
@@ -336,33 +277,4 @@ instance KnownRadix p => PadicNum (Mod p) where
   fromUnit (u, 0) = u
   fromUnit _ = 0
   splitUnit u = (u, 0)
-
------------------------------------------------------------
-
-{- | For a given list extracts prefix and a cycle, limiting length of prefix and cycle by @len@.
-Uses the modified tortiose-and-hare method. -}
-findCycle :: Eq a => Int -> [a] -> Maybe ([a], [a])
-findCycle len lst =
-  find test [ rollback (a, c)
-            | (a, cs) <- tortoiseHare len lst
-            , c <- take 1 [ c | c <- tail (inits cs)
-                              , and $ zipWith (==) cs (cycle c) ] ]
-  where
-    rollback (as, bs) = go (reverse as, reverse bs)
-      where
-        go =
-          \case
-            ([], ys) -> ([], reverse ys)
-            (x:xs, y:ys)
-              | x == y -> go (xs, ys ++ [x])
-            (xs, ys) -> (reverse xs, reverse ys)
-    test (_, []) = False
-    test (pref, c) = and $ zipWith (==) (take len lst) (pref ++ cycle c)
-
-tortoiseHare :: Eq a => Int -> [a] -> [([a], [a])]
-tortoiseHare l x =
-  map (fmap fst) $
-  filter (\(_, (a, b)) -> concat (replicate 3 a) == b) $
-  zip (inits x) $
-  zipWith splitAt [1 .. l] $ zipWith take [4, 8 ..] $ tails x
 

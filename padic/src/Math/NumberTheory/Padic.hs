@@ -33,7 +33,7 @@ The documentation and the module use following terminology:
   * `precision` -- maximal power \(k\) in p-adic expansion.
   * `unit` -- invertible muliplier \(u\) for prime \(p\)
   * `valuation` -- exponent \(v\)
-  * `digits` -- list \(d_0,d_1,d_2,... d_k\) in the p-adic expansion of a number
+  * `digits` -- list \(d_0,d_1,d_2,... d_k\) in the canonical p-adic expansion of a number
   * `lifted` -- digit \(N\) lifted to modulo \(p^k\).
 
 Rational p-adic number is represented as a tuple, containing a unit (belonging to \(\mathbb{Z_p}\) ) and valuation, which may be negative.
@@ -85,13 +85,13 @@ module Math.NumberTheory.Padic
   , PadicNum
   , Unit
   , Digit
-  , Lifted
   -- * Functions and utilities
   -- ** p-adic numbers and arithmetics
   , radix
   , precision
   , digits
   , firstDigit
+  , reduce
   , fromDigits
   , lifted
   , mkUnit
@@ -109,6 +109,7 @@ module Math.NumberTheory.Padic
   -- ** p-adic analysis
   , findSolutionMod
   , henselLifting
+  , unityRoots
   , pSqrt
   , pPow
   , pExp

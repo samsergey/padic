@@ -34,7 +34,6 @@ newtype Q' (p :: Nat) (prec :: Nat) = Q' (Z' p prec, Int)
 
 instance Radix p prec => PadicNum (Q' p prec) where
   type Unit (Q' p prec) = Z' p prec
-  type Lifted (Q' p prec) = Lifted (Z' p prec)
   type Digit (Q' p prec) = Digit (Z' p prec)
 
   {-# INLINE precision #-}
@@ -78,12 +77,12 @@ instance Radix p prec => Show (Q' p prec) where
         case compare k 0 of
           EQ -> ([0], ds)
           GT -> ([0], replicate k 0 ++ ds)
-          LT -> splitAt (-k) ds
+          LT -> splitAt (-k) (ds ++ repeat 0)
       sf = intercalate sep $ showD <$> reverse f
       si =
         case findCycle pr i of
           Nothing
-            | i == [] -> "0"
+            | null i -> "0"
             | length i > pr -> ell ++ toString (take pr i)
             | otherwise -> toString i
           Just ([], [0]) -> "0"
@@ -126,9 +125,8 @@ instance Radix p prec => Num (Q' p prec) where
   Q' (Z' (R a), va) * Q' (Z' (R b), vb) = Q' (Z' (R (a * b)), va + vb)
       
   negate (Q' (u, v)) = Q' (negate u, v)
-  abs = id
-  signum 0 = 0
-  signum _ = 1
+  abs = fromRational . norm
+  signum = pSignum
 
 instance Radix p prec => Fractional (Q' p prec) where
   fromRational 0 = 0

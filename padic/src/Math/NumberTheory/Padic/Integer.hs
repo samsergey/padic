@@ -1,7 +1,5 @@
 {-# OPTIONS_HADDOCK hide, prune, ignore-exports #-}
 
-{-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -16,6 +14,7 @@ import Data.Ratio
 import GHC.TypeLits (Nat, natVal)
 import GHC.Integer.GMP.Internals (recipModInteger)
 import Math.NumberTheory.Padic.Types
+import Math.NumberTheory.Padic.Analysis
 
 ------------------------------------------------------------
 
@@ -35,9 +34,6 @@ type Z p = Z' p (SufficientPrecision Word32 p)
 newtype Z' (p :: Nat) (prec :: Nat) = Z' (R prec p)
 newtype R (prec :: Nat ) (p :: Nat) = R (Mod (LiftedRadix p prec))
 
-deriving via Mod (LiftedRadix p prec) instance Radix p prec => Num (R prec p)
-deriving via R prec p instance Radix p prec => Num (Z' p prec)
-
 instance Radix p prec => Eq (Z' p prec) where
   x@(Z' (R a)) == Z' (R b) = unMod a `mod` pk == unMod b `mod` pk
     where
@@ -45,7 +41,6 @@ instance Radix p prec => Eq (Z' p prec) where
 
 instance Radix p prec => PadicNum (Z' p prec) where
   type Unit (Z' p prec) = Z' p prec
-  type Lifted (Z' p prec) = Integer
   type Digit (Z' p prec) = Mod p 
 
   {-# INLINE precision #-}
@@ -101,6 +96,15 @@ instance Radix p prec => Show (Z' p prec) where
       sep
         | radix n < 11 = ""
         | otherwise = " "
+
+instance Radix p prec => Num (Z' p prec) where
+  fromInteger = Z' . R . fromInteger
+  Z' (R a) + Z' (R b) = Z' . R $ a + b
+  Z' (R a) - Z' (R b) = Z' . R $ a - b
+  Z' (R a) * Z' (R b) = Z' . R $ a * b
+  negate (Z' (R a)) = Z' . R $ negate a
+  abs x = if valuation x == 0 then 1 else 0
+  signum = pSignum
 
 instance Radix p prec  => Enum (Z' p prec) where
   toEnum = fromIntegral

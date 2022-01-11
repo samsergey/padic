@@ -53,7 +53,7 @@ instance Arbitrary SmallRational where
     n <- chooseInteger (-m, m)
     d <- chooseInteger (1,m)
     return $ SmallRational (n % d)
-  shrink (SmallRational r) = SmallRational <$> []
+  shrink (SmallRational r) = SmallRational <$> shrink r
  
 a @/= b = assertBool "" (a /= b)
 

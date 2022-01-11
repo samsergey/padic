@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_HADDOCK hide, prune, ignore-exports #-}
 
@@ -9,9 +10,115 @@ module Math.NumberTheory.Padic.Analysis where
 
 import Math.NumberTheory.Padic.Types
 import Data.Mod
+import Data.Ratio
+import Data.List (unfoldr, genericLength, tails, inits,find)
 import Data.Maybe
 import GHC.TypeLits hiding (Mod)
+import Control.Applicative ((<|>))
+
+------------------------------------------------------------
+
+ -- | Unfolds a number to a list of digits (integers modulo @p@).  
+toRadix :: KnownRadix p => Integer -> [Mod p]
+toRadix 0 = [0]
+toRadix n = res
+  where
+    res = unfoldr go n
+    p = fromIntegral $ natVal $ head $ 0 : res
+    go 0 = Nothing
+    go x =
+      let (q, r) = quotRem x p
+       in Just (fromIntegral r, q)
   
+-- | Folds a list of digits (integers modulo @p@) to a number.
+fromRadix :: KnownRadix p => [Mod p] -> Integer
+fromRadix ds = foldr (\x r -> lifted x + r * p) 0 ds
+  where
+    p = fromIntegral $ natVal $ head $ 0 : ds
+
+extEuclid :: Integral i => (Integer, Integer) -> Ratio i
+extEuclid (n, m) = go (m, 0) (n, 1)
+  where
+    go (v1, v2) (w1, w2)
+      | 2*w1*w1 > abs m =
+        let q = v1 `div` w1
+         in go (w1, w2) (v1 - q * w1, v2 - q * w2)
+      | otherwise = fromRational (w1 % w2)
+
+{- | Extracts p-adic unit from integer number. For radix \(p\) and integer \(n\) returns
+pair \((u, k)\) such that \(n = u \cdot p^k\).
+
+Examples:
+ 
+>>> getUnitZ  10 120
+(12,1)
+>>> getUnitZ 2 120
+(15,3)
+>>> getUnitZ 3 120
+(40,1)
+-}
+getUnitZ :: (Integral p, Integral n) => p -> n -> (p, Int)
+getUnitZ _ 0 = (0, 0)
+getUnitZ p x = (b, length v)
+  where
+    (v, b:_) = span (\n -> n `mod` p == 0) $ iterate (`div` p) $ fromIntegral x
+
+{- | Extracts p-adic unit from a rational number. For radix \(p\) and rational number \(x\) returns
+pair \((r/s, k)\) such that \(x = r/s \cdot p^k\) and \(\gcd r s = \gcd s p = 1, p \nmid r\).
+
+
+Examples:
+
+>>> getUnitQ 3 (75/157)
+(25 % 157, 1)
+>>> getUnitQ 5 (75/157)
+(3 % 157, 2)
+>>> getUnitQ 157 (75/157)
+(75 % 1, -1)
+>>> getUnitQ 10 (1/60)
+(5 % 3, -2)
+-}
+getUnitQ :: Integral p => p -> Ratio p -> (Ratio p, Int)
+getUnitQ _ 0 = (0, 0)
+getUnitQ p x = ((n * n') % d, vn - vd)
+  where
+    go m (d, vd) = case gcd d p of
+      1 -> (m, d, vd)
+      c -> let (d', vd') = getUnitZ c d
+           in go (m * (p `div` c)^vd') (d', vd + vd')
+    (n, vn) = getUnitZ p (numerator x)
+    (n', d, vd) = go 1 $ getUnitZ p (denominator x)
+
+-----------------------------------------------------------
+
+{- | For a given list extracts prefix and a cycle, limiting length of prefix and cycle by @len@.
+Uses the modified tortiose-and-hare method. -}
+findCycle :: Eq a => Int -> [a] -> Maybe ([a], [a])
+findCycle len lst =
+  find test [ rollback (a, c)
+            | (a, cs) <- tortoiseHare len lst
+            , c <- take 1 [ c | c <- tail (inits cs)
+                              , and $ zipWith (==) cs (cycle c) ] ]
+  where
+    rollback (as, bs) = go (reverse as, reverse bs)
+      where
+        go =
+          \case
+            ([], ys) -> ([], reverse ys)
+            (x:xs, y:ys)
+              | x == y -> go (xs, ys ++ [x])
+            (xs, ys) -> (reverse xs, reverse ys)
+    test (_, []) = False
+    test (pref, c) = and $ zipWith (==) (take len lst) (pref ++ cycle c)
+
+tortoiseHare :: Eq a => Int -> [a] -> [([a], [a])]
+tortoiseHare l x =
+  map (fmap fst) $
+  filter (\(_, (a, b)) -> concat (replicate 3 a) == b) $
+  zip (inits x) $
+  zipWith splitAt [1 .. l] $ zipWith take [4, 8 ..] $ tails x
+
+ 
 {- | Returns p-adic solutions (if any) of the equation \(f(x) = 0\) using Hensel lifting method.
 First, solutions of \(f(x) = 0\ \mathrm{mod}\ p\) are found, then by Newton's method this solution is get lifted to p-adic number (up to specified precision).
 
@@ -30,10 +137,7 @@ henselLifting ::
 henselLifting f f' = res
   where
     pr = precision (head res)
-    res = findSolutionMod f >>= iterateM pr step
-    step x = do
-      invf' <- maybeToList (inverse (f' x))
-      return (x - f x * invf')
+    res = findSolutionMod f >>= newtonsMethod pr f f'
 
 {- | Returns solution of the equation \(f(x) = 0\ \mathrm{mod}\ p\) in p-adics.
 Used as a first step if `henselLifting` function and is usefull for introspection.
@@ -50,6 +154,14 @@ findSolutionMod f = [ fromMod d | d <- [0..], fm d == 0 ]
     fm = firstDigit . f . fromMod
     fromMod x = fromDigits [x]
 
+newtonsMethod
+  :: PadicNum n => Int -> (n -> n) -> (n -> n) -> n -> [n]
+newtonsMethod n f f' = iterateM n step
+  where
+    step x = do
+      invf' <- maybeToList (inverse (f' x))
+      return (x - f x * invf')  
+
 iterateM :: (Eq a, Monad m) => Int -> (a -> m a) -> a -> m a
 iterateM n f = go n
   where
@@ -57,7 +169,27 @@ iterateM n f = go n
     go i x = do
       y <- f x
       if x == y then pure x else go (i - 1) y
-   
+
+{- | Returns a list of m-th roots of unity.  -}
+unityRoots :: (KnownRadix p, PadicNum n, Digit n ~ Mod p) => Integer -> [n]
+unityRoots m = henselLifting f f'
+  where
+    f x = x^m - 1
+    f' x = fromInteger m * x ^ (m - 1)    
+
+pSignum :: (PadicNum n, KnownRadix p, Digit n ~ Mod p) => n -> n
+pSignum n
+  | d0 == 0 = 0
+  | d0^p /= d0 = 1
+  | otherwise = case res of
+      [] -> 1
+      x:_ -> x
+  where
+    d0 = firstDigit n
+    p = radix n
+    pr = precision n
+    res = newtonsMethod pr (\x -> x^(p - 1) - 1) (\x -> fromInteger (p - 1)*x^(p-2)) (fromDigits [d0])
+    
 -------------------------------------------------------------
 
 {- | Returns p-adic exponent function, calculated via Taylor series.
@@ -233,14 +365,12 @@ pSqrt ::
      , PadicNum n
      , KnownRadix p
      , Digit n ~ Mod p
-     , PadicNum (Unit n)
-     , Lifted (Unit n) ~ Integer
      )
   => n -> [n]
 pSqrt x
   | odd (radix x) && isSquareResidue x =
     henselLifting (\y -> y * y - x) (2 *)
-  | lifted (unit x) `mod` 4 /= 3 && lifted (unit x) `mod` 8 == 1 =
+  | lifted x `mod` 4 /= 3 && lifted x `mod` 8 == 1 =
       let r = pSqrt2 x in [r, -r]
   | otherwise = []
 

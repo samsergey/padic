@@ -74,14 +74,25 @@ getUnitTests = testGroup "p-adic units."
   , testGroup "Rationals"
     [ testCase "2" $ getUnitQ 2 (4%7) @?= (1 % 7, 2)
     , testCase "7" $ getUnitQ 7 (4%7) @?= (4 % 1, -1)
-    , testProperty "0" $ \(AnyRadix p) -> getUnitQ p 0 === (0, 0)
-    , testProperty "1" $ \(AnyRadix p) -> getUnitQ p 1 === (1, 0)
-    , testProperty "p" $
-      \(AnyRadix p) r -> let (u, k) = getUnitQ p r
-                         in r === fromIntegral p^^k * u
+    , testCase "10" $ getUnitQ 10 (1%20) @?= (5 % 1, -2)
+    , unitProperties
     ]
   ]
- 
+
+unitProperties = testGroup "Unit properties" $
+  [ testProperty "reconstruction from unit" $
+    \(AnyRadix p) r -> let (u, k) = getUnitQ p r
+                       in r === fromIntegral p^^k * u
+  , testProperty "p does not divide numerator" $
+    \(AnyRadix p) r -> let (u, k) = getUnitQ p r
+                       in u /= 0 ==> numerator u `mod` p =/= 0
+  , testProperty "denominator is comprime with p" $
+    \(AnyRadix p) r -> let (u, k) = getUnitQ p r
+                       in u /= 0 ==> gcd (denominator u) p == 1
+  , testProperty "0" $ \(AnyRadix p) -> getUnitQ p 0 === (0, 0)
+  , testProperty "1" $ \(AnyRadix p) -> getUnitQ p 1 === (1, 0)
+  ]
+
 ------------------------------------------------------------
 testSuite = testGroup "Commons"
   [ cycleTest
