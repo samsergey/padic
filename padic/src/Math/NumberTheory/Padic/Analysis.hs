@@ -18,7 +18,7 @@ import Control.Applicative ((<|>))
 
 ------------------------------------------------------------
 
- -- | Unfolds a number to a list of digits (integers modulo @p@).  
+-- | Unfolds a number to a list of digits (integers modulo @p@).  
 toRadix :: KnownRadix p => Integer -> [Mod p]
 toRadix 0 = [0]
 toRadix n = res
@@ -64,7 +64,7 @@ getUnitZ p x = (b, length v)
     (v, b:_) = span (\n -> n `mod` p == 0) $ iterate (`div` p) $ fromIntegral x
 
 {- | Extracts p-adic unit from a rational number. For radix \(p\) and rational number \(x\) returns
-pair \((r/s, k)\) such that \(x = r/s \cdot p^k\) and \(\gcd r s = \gcd s p = 1, p \nmid r\).
+pair \((r/s, k)\) such that \(x = r/s \cdot p^k,\quad \gcd(r, s) = \gcd(s, p) = 1\) and \(p \nmid r\).
 
 
 Examples:

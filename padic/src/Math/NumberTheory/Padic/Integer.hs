@@ -121,8 +121,9 @@ instance Radix p prec => Integral (Z' p prec) where
     where
       r = toRational n
   a `quotRem` b = case inverse b of
-    Nothing -> error "not divisible!" 
+    Nothing -> error $ show b ++ " is not divisible modulo " ++ show (radix a) ++ "!" 
     Just r -> let q = a*r in (q, a - q * b)
+
 
 instance Radix p prec => Ord (Z' p prec) where
   compare = error "ordering is not defined for Z"

@@ -15,25 +15,27 @@ i.e. rational reconstruction, computation of square roots etc.
 A truncated p-adic number \(x\) can be represented in three ways:
 
 \[
-x = p^v u = d_0 + d_1 p + d_2 p^2 + ... d_k p^k = N\ \mathrm{mod}\ p^k,\\
-p > 1, k > 0, v \in \mathbb{Z},\\
-u \in \mathbb{Z_p}\\
-d_i \in \mathbb{Z}/p\mathbb{Z}\\
-N \in  \mathbb{Z}/p^k \mathbb{Z}\\
+\begin{align}
+x &= p^v u & (1)\\
+& = d_0 + d_1 p + d_2 p^2 + ... d_k p^k & (2)\\
+&= N\ \mathrm{mod}\ p^k, & (3)
+\end{align}
 \]
+where \(p > 1, k > 0, v \in \mathbb{Z},u \in \mathbb{Z_p},d_i \in \mathbb{Z}/p\mathbb{Z}, N \in  \mathbb{Z}/p^k \mathbb{Z}\)
 
 In order to gain efficiency the integer p-adic number with radix \(p\) is internally
-represented as only one digit \(N\), lifted to modulo \(p^k\), where \(k\) is
+represented in form \((3)\) as only one digit \(N\), lifted to modulo \(p^k\), where \(k\) is
 chosen so that within working precision numbers belogning to @Int@ and @Ratio Int@ types could be
-reconstructed by extended Euclidean method. 
+reconstructed by extended Euclidean method. Form \((2)\) is used for textual output only, and form \((1)\)
+is used for transrornations to and from rationals.
 
-The documentation and the module use following terminology:
+The documentation and the module bindings use following terminology:
 
-  * `radix` -- modulus \(p\)
-  * `precision` -- maximal power \(k\) in p-adic expansion.
-  * `unit` -- invertible muliplier \(u\) for prime \(p\)
-  * `valuation` -- exponent \(v\)
-  * `digits` -- list \(d_0,d_1,d_2,... d_k\) in the canonical p-adic expansion of a number
+  * `radix` -- modulus \(p\) of p-adic number,
+  * `precision` -- maximal power \(k\) in p-adic expansion,
+  * `unit` -- invertible muliplier \(u\) for prime \(p\),
+  * `valuation` -- exponent \(v\),
+  * `digits` -- list \(d_0,d_1,d_2,... d_k\) in the canonical p-adic expansion of a number,
   * `lifted` -- digit \(N\) lifted to modulo \(p^k\).
 
 Rational p-adic number is represented as a tuple, containing a unit (belonging to \(\mathbb{Z_p}\) ) and valuation, which may be negative.

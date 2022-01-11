@@ -30,7 +30,7 @@ type instance Padic (Ratio Word) p = Q' p (SufficientPrecision Word64 p)
 type Q p = Q' p (SufficientPrecision Word32 p)
 
 -- |  Rational p-adic number with explicitly specified precision.
-newtype Q' (p :: Nat) (prec :: Nat) = Q' (Z' p prec, Int)
+data Q' (p :: Nat) (prec :: Nat) = Q' !(Z' p prec) !Int
 
 instance Radix p prec => PadicNum (Q' p prec) where
   type Unit (Q' p prec) = Z' p prec
@@ -40,24 +40,24 @@ instance Radix p prec => PadicNum (Q' p prec) where
   precision = fromIntegral . natVal
 
   {-# INLINE  radix #-}
-  radix (Q' (u, _)) = radix u
+  radix (Q' u _) = radix u
 
   {-# INLINE digits #-}
-  digits (Q' (u, v)) = replicate v 0 ++ toRadix (lifted u)
+  digits (Q' u v) = replicate v 0 ++ toRadix (lifted u)
 
   {-# INLINE fromDigits #-}
-  fromDigits ds = normalize $ Q' (fromDigits ds, 0)
+  fromDigits ds = normalize $ Q' (fromDigits ds) 0
 
   {-# INLINE lifted #-}
-  lifted (Q' (u, _)) = lifted u
+  lifted (Q' u _) = lifted u
 
   {-# INLINE mkUnit #-}
-  mkUnit ds = normalize $ Q' (mkUnit ds, 0)
+  mkUnit ds = normalize $ Q' (mkUnit ds) 0
 
   {-# INLINE fromUnit #-}
-  fromUnit = Q'
+  fromUnit (u, v) = Q' u v
 
-  splitUnit n@(Q' (u, v)) =
+  splitUnit n@(Q' u v) =
     let pr = precision n
         (u', v') = splitUnit u
     in if v + v' > pr then (0, pr) else (u', v + v')     
@@ -71,13 +71,13 @@ instance Radix p prec => Show (Q' p prec) where
   show n = si ++ sep ++ "." ++ sep ++ sf
     where
       (u, k) = splitUnit (normalize n)
-      pr = precision n
+      pr = precision n 
       ds = digits u
       (f, i) =
         case compare k 0 of
           EQ -> ([0], ds)
           GT -> ([0], replicate k 0 ++ ds)
-          LT -> splitAt (-k) (ds ++ repeat 0)
+          LT -> splitAt (-k) (ds ++ replicate (pr + k) 0)
       sf = intercalate sep $ showD <$> reverse f
       si =
         case findCycle pr i of
@@ -112,37 +112,36 @@ instance Radix p prec => Ord (Q' p prec) where
   compare = error "Order is nor defined for p-adics."
 
 instance Radix p prec => Num (Q' p prec) where
-  fromInteger n = normalize $ Q' (fromInteger n, 0)
+  fromInteger n = normalize $ Q' (fromInteger n) 0
           
-  x@(Q' (Z' (R a), va)) + Q' (Z' (R b), vb) =
+  x@(Q' (Z' (R a)) va) + Q' (Z' (R b)) vb =
     case compare va vb of
-      LT -> Q' (Z' (R (a + p ^% (vb - va) * b)), va)
-      EQ -> Q' (Z' (R (a + b)), va)
-      GT -> Q' (Z' (R (p ^% (va - vb) * a + b)), vb)
+      LT -> Q' (Z' (R (a + p ^% (vb - va) * b))) va
+      EQ -> Q' (Z' (R (a + b))) va
+      GT -> Q' (Z' (R (p ^% (va - vb) * a + b))) vb
     where
       p = fromInteger (radix x)
       
-  Q' (Z' (R a), va) * Q' (Z' (R b), vb) = Q' (Z' (R (a * b)), va + vb)
+  Q' (Z' (R a)) va * Q' (Z' (R b)) vb = Q' (Z' (R (a * b))) (va + vb)
       
-  negate (Q' (u, v)) = Q' (negate u, v)
+  negate (Q' u v) = Q' (negate u) v
   abs = fromRational . norm
   signum = pSignum
+
+newtype Delay prec p = Delay (Q' p prec)
 
 instance Radix p prec => Fractional (Q' p prec) where
   fromRational 0 = 0
   fromRational x = res
     where
-      res = Q' (n `div` d, v)
-      p = radix res
+      res = Q' (n `div` d) v
+      p = fromInteger $ natVal (Delay res)
       (q, v) = getUnitQ p x
       (n, d) = (mkUnit $ numerator q, mkUnit $ denominator q)
-  a / b = Q' (res, valuation a - valuation b')
+  a / b = Q' u (v + valuation a - valuation b')
     where
       b' = normalize b
-      res
-        | isInvertible b' = unit a `div` unit b'
-        | otherwise = 
-          error $ show b' ++ " is indivisible in " ++ show (radix a) ++ "-adics!"
+      Q' u v = fromRational (lifted a % lifted b')
 
 instance Radix p prec => Real (Q' p prec) where
   toRational n = toRational (unit n) / norm n
