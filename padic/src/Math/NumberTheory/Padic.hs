@@ -8,9 +8,8 @@ Maintainer  : samsergey@yandex.ru
 Stability   : experimental
 Portability : POSIX
 
-Module introduces p-adic integers \(\mathbb{Z}_p\) and p-adic rational numbers \(\mathbb{Q}_p\)
- and implements basic arithmetic as well as some specific functions,
-i.e. rational reconstruction, computation of square roots etc.
+Module introduces p-adic integers and rationals with basic p-adic arithmetics
+and implments some specific functions (rational reconstruction, p-adic signum function, square roots etc.).
 
 A truncated p-adic number \(x\) can be represented in three ways:
 
@@ -38,7 +37,7 @@ The documentation and the module bindings use following terminology:
   * `digits` -- list \(d_0,d_1,d_2,... d_k\) in the canonical p-adic expansion of a number,
   * `lifted` -- digit \(N\) lifted to modulo \(p^k\).
 
-Rational p-adic number is represented as a tuple, containing a unit (belonging to \(\mathbb{Z_p}\) ) and valuation, which may be negative.
+Rational p-adic number is represented as a unit (belonging to \(\mathbb{Z_p}\) ) and valuation, which may be negative.
 
 The radix \(p\) of a p-adic number is specified at a type level via type-literals. In order to use them GHCi should be loaded with `-XDataKinds` extensions.
 
