@@ -138,3 +138,9 @@ import Math.NumberTheory.Padic.Analysis
 import Data.Word
 import Data.Ratio
 
+pDigits p n d = series n
+  where
+    series 0 = []
+    series n =
+      let m = (n `div` d) `mod` p 
+      in m : series ((n - m * d) `div` p)
