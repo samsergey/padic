@@ -63,6 +63,26 @@ By default the precision of p-adics is computed so that it is possible to recons
 >>> sqrt 2 :: Q' 7 50
 …16244246442640361054365536623164112011266421216213.0
 
+
+Between types defined in the module there are bijective mappings as shown in the diagram:
+
+@
+                       [Mod p]
+                      /       \\
+             digits  /         \\  digits
+        fromDigits  /           \\  fromDigits
+                   /             \\
+    toInteger     /   fromUnit    \\   fromRational
+Z \<-----------\> Z p \<----------\> Q p \<------------\> Q
+   fromInteger    \\     unit      /    toRational
+                   \\             /
+            lifted  \\           /  lifted
+             mkUnit  \\         /  mkUnit
+                      \\       /
+                      Integer
+@
+
+
 -}
 ------------------------------------------------------------
 module Math.NumberTheory.Padic
