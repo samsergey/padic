@@ -128,3 +128,5 @@ instance Radix p prec => Integral (Z' p prec) where
 instance Radix p prec => Ord (Z' p prec) where
   compare = error "ordering is not defined for Z"
 
+zPow :: Radix p prec => Z' p prec -> Z' p prec -> Z' p prec
+zPow (Z' (R a)) (Z' (R b)) = Z' . R $  a ^% fromIntegral (unMod b)

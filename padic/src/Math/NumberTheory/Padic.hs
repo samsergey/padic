@@ -133,6 +133,7 @@ module Math.NumberTheory.Padic
   , unityRoots
   , pSqrt
   , pPow
+  , zPow
   , pExp
   , pLog
   , pSin
@@ -157,6 +158,7 @@ import Math.NumberTheory.Padic.Rational
 import Math.NumberTheory.Padic.Analysis
 import Data.Word
 import Data.Ratio
+import Data.Mod
 
 pDigits p n d = series n
   where
@@ -164,3 +166,16 @@ pDigits p n d = series n
     series n =
       let m = (n `div` d) `mod` p 
       in m : series ((n - m * d) `div` p)
+
+(↑) ::  Radix p prec => Z' p prec -> Z' p prec -> Z' p prec  
+(↑) = zPow
+
+(↑↑) :: Radix p prec => Z' p prec -> Z' p prec -> Z' p prec 
+a ↑↑ 0 = 1
+a ↑↑ 1 = a
+a ↑↑ b = a ↑ (a ↑↑ (b - 1))
+
+(↑↑↑) :: Radix p prec => Z' p prec -> Z' p prec -> Z' p prec 
+a ↑↑↑ 0 = 1
+a ↑↑↑ 1 = a
+a ↑↑↑ b =  a ↑↑ (a ↑↑↑ (b - 1))
