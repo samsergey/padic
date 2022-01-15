@@ -1,7 +1,7 @@
 ;; -*- mode: emacs-lisp -*-
 
 ;; pandoc-mode local settings file for habrPost2.md
-;; saved on 2022.01.15 09:30
+;; saved on 2022.01.15 14:08
 
 ((mathml)
  (mathjax)

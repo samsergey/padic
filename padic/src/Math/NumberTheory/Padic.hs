@@ -167,15 +167,8 @@ pDigits p n d = series n
       let m = (n `div` d) `mod` p 
       in m : series ((n - m * d) `div` p)
 
-(↑) ::  Radix p prec => Z' p prec -> Z' p prec -> Z' p prec  
-(↑) = zPow
 
-(↑↑) :: Radix p prec => Z' p prec -> Z' p prec -> Z' p prec 
-a ↑↑ 0 = 1
-a ↑↑ 1 = a
-a ↑↑ b = a ↑ (a ↑↑ (b - 1))
-
-(↑↑↑) :: Radix p prec => Z' p prec -> Z' p prec -> Z' p prec 
-a ↑↑↑ 0 = 1
-a ↑↑↑ 1 = a
-a ↑↑↑ b =  a ↑↑ (a ↑↑↑ (b - 1))
+(^^^) :: Radix p prec => Z' p prec -> Z' p prec -> Z' p prec 
+a ^^^ 0 = 1
+a ^^^ 1 = a
+a ^^^ b = a `zPow` (a ^^^ (b - 1))
