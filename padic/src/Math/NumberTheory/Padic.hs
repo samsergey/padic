@@ -167,6 +167,13 @@ pDigits p n d = series n
       let m = (n `div` d) `mod` p 
       in m : series ((n - m * d) `div` p)
 
+ratrec max n m = go (m,0) (n,1)
+  where
+    go (v1, v2) (w1, w2)
+      | w1 < max = [(w1,w2)]
+      | otherwise = let q = v1 `div` w1
+                    in (v1, v2) : go (w1, w2) (v1 - q * w1, v2 - q * w2)
+
 
 (^^^) :: Radix p prec => Z' p prec -> Z' p prec -> Z' p prec 
 a ^^^ 0 = 1
