@@ -29,6 +29,7 @@ library
       Math.NumberTheory.Padic.Analysis
       Math.NumberTheory.Padic.Integer
       Math.NumberTheory.Padic.Rational
+      Math.NumberTheory.Padic.Short
       Math.NumberTheory.Padic.Types
   other-modules:
       Paths_padic
